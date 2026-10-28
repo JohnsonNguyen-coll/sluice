@@ -1,0 +1,35 @@
+{
+  "network": "Arc Testnet",
+  "chainId": 5042002,
+  "v1": {
+    "deployedAt": "2026-10-28T03:23:38.457Z",
+    "contracts": {
+      "AgentWalletFactory": {
+        "address": "0xdae395f504be412ddfc0646b37ac1840a1462c08",
+        "txHash": "0x03eb70a78221dbbda555dcc344a778aa6c3c6795079f07a1b16abbf4def3275e",
+        "explorerUrl": "https://explorer.testnet.arc.io/address/0xdae395f504be412ddfc0646b37ac1840a1462c08",
+        "constructorArgs": {
+          "usdc": "0x3600000000000000000000000000000000000000",
+          "feeRecipient": "0x5B12Ce46C7194aD57d143bC22847224047b1Ef42",
+          "feeBps": 30
+        }
+      }
+    }
+  },
+  "v2": {
+    "deployedAt": "2026-10-28T03:44:38.205Z",
+    "contracts": {
+      "AgentWalletFactoryV2": {
+        "address": "0x92f357b256f5fb6a0f7e635a29462601c1cb6547",
+        "txHash": "0x30367e8f50559ce58b647a9878a0f992b0547447edc6a4337dfad763ea52ff1d",
+        "explorerUrl": "https://explorer.testnet.arc.io/address/0x92f357b256f5fb6a0f7e635a29462601c1cb6547",
+        "constructorArgs": {
+          "feeRecipient": "0x5B12Ce46C7194aD57d143bC22847224047b1Ef42",
+          "feeBps": 30,
+          "initialTokens": ["0x3600000000000000000000000000000000000000"]
+        },
+        "notes": "V2 factory does not take a single USDC address — any allowlisted ERC-20 is valid. USDC is the initial allowed token."
+      }
+    }
+  }
+}

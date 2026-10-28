@@ -1,0 +1,52 @@
+# Dependencies (keep bun.lock and vendored lib/forge-std)
+node_modules/
+
+# Local environment and credentials (keep safe example templates)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+/keystore/
+/keystores/
+
+# Frontend builds, tooling caches and test reports
+dist/
+.vite/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Foundry generated artifacts and transaction caches
+/contracts/out/
+/contracts/cache/
+/contracts/broadcast/
+/out/
+/cache/
+/broadcast/
+
+# Local deployment sessions and verification receipts
+/.compass/
+/contracts/.compass-verify/
+/contracts/deploy.lock.json
+
+# Local tools, downloaded packages and runtime logs
+/.tools/
+*.log
+/console.jsonl
+
+# Editor and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep source, docs, deployments/, contracts/contract-metadata/,
+# .gas-snapshot and tool version files under version control.

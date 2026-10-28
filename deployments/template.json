@@ -1,0 +1,19 @@
+{
+  "_comment": "Populated by deploy scripts. Copy to <network>.json (e.g. arc-testnet.json) and fill in values.",
+  "network": "",
+  "chainId": 0,
+  "deployedAt": "",
+  "deployer": "",
+  "contracts": {
+    "AgentWalletFactory": {
+      "address": "",
+      "txHash": "",
+      "blockNumber": 0,
+      "constructorArgs": {
+        "usdc": "",
+        "feeRecipient": "",
+        "feeBps": 0
+      }
+    }
+  }
+}
