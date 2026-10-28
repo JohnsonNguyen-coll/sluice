@@ -10,5 +10,5 @@ function subscribe(listener: () => void) {
 function getLight(){const theme=document.documentElement.dataset.theme;return theme==='light'||((!theme||theme==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);}
 export function VeilBackground(){
  const light=useSyncExternalStore(subscribe,getLight,()=>false);
- return <><div className="veil-backdrop" aria-hidden="true"><DarkVeil speed={1.5} color={light?'#5268c7':'#8798ee'} scale={0.95} flow={0.75} warp={0.12} brightness={1.35} sheen={0.65} glow={0.7} grain={0.025} quality={0.6} dpr={1} opacity={0.9} intro={false} mouseInteraction={false} lightMode={light}/><div className="veil-shading"/></div></>;
+ return <><div className="veil-backdrop" aria-hidden="true"><DarkVeil speed={2} color={light?'#5268c7':'#8798ee'} scale={0.95} flow={0.75} warp={0.12} brightness={1.35} sheen={0.65} glow={0.7} grain={0.025} quality={0.6} dpr={1} opacity={0.9} intro={false} mouseInteraction={false} lightMode={light}/><div className="veil-shading"/></div></>;
 }

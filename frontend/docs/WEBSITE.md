@@ -198,6 +198,6 @@ The landing now uses the React Bits Dark Veil component (native WebGL2) with the
 
 The layout has a centered typographic hero, a full-width payment rail, asymmetric control/code sections, an open roadmap and a larger closing CTA. Shared marketing/docs footers use grouped navigation. All app routes and wallet behavior remain unchanged.
 
-The hero background is lazy-loaded, confined to the top of the landing and paused outside the viewport or when the document is hidden. Animation runs automatically at speed 1.5 (three times the upstream default), without a pause control or custom frame-rate cap. Local changes include live reduced-motion support, safe WebGL fallback, resizable texture allocation and Strict Mode-safe cleanup. The site palette remains graphite/periwinkle in dark mode and cool-white/indigo in light mode.
+The hero background is lazy-loaded, confined to the top of the landing and paused outside the viewport or when the document is hidden. Animation runs automatically at speed 2 (four times the upstream default), without a pause control or custom frame-rate cap. Local changes include live reduced-motion support, safe WebGL fallback, resizable texture allocation and Strict Mode-safe cleanup. The site palette remains graphite/periwinkle in dark mode and cool-white/indigo in light mode.
 
 The voucher sample is copied from contract/src/AgentWalletV3.sol; SDK/middleware integrations are explicitly marked in progress. No usage metrics, customer claims or balances are invented.
