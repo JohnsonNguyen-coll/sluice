@@ -196,8 +196,10 @@ The MDX content source content/docs/** and compilation/search pipeline are delib
 
 The landing now uses the React Bits Dark Veil component (native WebGL2) with the upstream MIT + Commons Clause license retained in frontend/src/web/components/backgrounds/REACT_BITS_LICENSE.md. Only the required component is included; no extra graphics package is installed.
 
-The layout has a centered typographic hero, a full-width payment rail, asymmetric control/code sections, an open roadmap and a larger closing CTA. Shared marketing/docs footers use grouped navigation. All app routes and wallet behavior remain unchanged.
+The landing retains its centered hero. An animated payment-path concept diagram sits below it, followed by the provider-budget demo, integration/code section and compact release strip. Contract code uses theme-aware syntax colors. Shared marketing/docs footers use grouped navigation. All app routes and wallet behavior remain unchanged.
 
 The hero background is lazy-loaded, confined to the top of the landing and paused outside the viewport or when the document is hidden. Animation runs automatically at speed 2 (four times the upstream default), without a pause control or custom frame-rate cap. Local changes include live reduced-motion support, safe WebGL fallback, resizable texture allocation and Strict Mode-safe cleanup. The site palette remains graphite/periwinkle in dark mode and cool-white/indigo in light mode.
 
 The voucher sample is copied from contract/src/AgentWalletV3.sol; SDK/middleware integrations are explicitly marked in progress. No usage metrics, customer claims or balances are invented.
+
+CodeBlock renders safe React spans for syntax tokens with theme-specific colors. Copy uses the original source, including whitespace. Unknown language labels use plain text.

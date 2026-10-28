@@ -213,3 +213,107 @@
  .footer-link-group{font-size:14px}.footer-content .footer-bottom{gap:12px}
 }
 @media(prefers-reduced-motion:reduce){.hero-text-link svg,.editorial-link svg{transition:none}}
+
+/* Payment path retained within the centered landing layout. */
+
+.protocol-diagram{margin:0;min-width:0;padding:25px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--bg) 92%,transparent);box-shadow:0 30px 90px #00000022;position:relative}
+.protocol-diagram:before{content:'';position:absolute;inset:-1px;pointer-events:none;border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 6%,transparent),transparent 50%)}
+.protocol-diagram figcaption{position:relative;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:32px;font-size:10px;letter-spacing:.07em}
+.diagram-concept{color:var(--muted);font-size:11px;letter-spacing:0}
+.diagram-node{display:flex;gap:14px;align-items:center;position:relative}
+.diagram-node-icon{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--accent)}
+.diagram-node>div:nth-child(2){flex:1;min-width:0}
+.diagram-node strong,.diagram-settlement strong{display:block;font-size:16px;font-weight:550}
+.diagram-node>div>span,.diagram-settlement>div>span{display:block;font-size:12px;line-height:1.6;color:var(--muted);margin-top:4px}
+.diagram-node-tag{font:10px 'Geist Mono Variable',monospace;letter-spacing:.05em;color:var(--subtle)}
+.diagram-connector{position:relative;display:flex;align-items:center;gap:9px;padding:23px 0 23px 59px;color:var(--accent)}
+.diagram-connector:before{content:'';position:absolute;left:21px;top:0;bottom:0;width:1px;background:linear-gradient(var(--border),var(--accent),var(--border))}
+.diagram-connector code{font-size:11px;color:var(--muted)}
+.diagram-connector>span{position:absolute;width:5px;height:5px;border-radius:50%;left:19px;top:50%;background:var(--accent)}
+.diagram-connector>svg{transform:rotate(90deg)}
+.diagram-settlement{display:flex;align-items:center;gap:14px;padding:18px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:8px}
+.diagram-settlement>svg{color:var(--accent);flex-shrink:0}
+.diagram-settlement>div{flex:1}
+.diagram-network{font:9px 'Geist Mono Variable',monospace;letter-spacing:.08em;color:var(--accent)}
+.diagram-footnote{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;color:var(--muted);padding-top:23px}
+
+/* Token colors are independent of panel/line emphasis. Text is rendered by React. */
+.code-block{--code-comment:#91a0b5;--code-keyword:#d4b2ff;--code-type:#89d9d1;--code-string:#b7d897;--code-number:#f0c089;--code-function:#9dbfff;--code-operator:#b1bdd0}
+:root[data-theme="light"] .code-block{--code-comment:#5d6b7d;--code-keyword:#7c389f;--code-type:#126b70;--code-string:#466e26;--code-number:#9a500b;--code-function:#2955a7;--code-operator:#57657a}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"]) .code-block{--code-comment:#5d6b7d;--code-keyword:#7c389f;--code-type:#126b70;--code-string:#466e26;--code-number:#9a500b;--code-function:#2955a7;--code-operator:#57657a}}
+.code-block .syntax-comment{color:var(--code-comment)}.code-block .syntax-keyword{color:var(--code-keyword)}.code-block .syntax-type{color:var(--code-type)}.code-block .syntax-string{color:var(--code-string)}.code-block .syntax-number{color:var(--code-number)}.code-block .syntax-function{color:var(--code-function)}.code-block .syntax-operator{color:var(--code-operator)}
+.code-block .code-line{display:block;min-width:100%}
+
+@media(max-width:640px){.protocol-diagram{padding:20px}.protocol-diagram figcaption{margin-bottom:26px;font-size:10px}.diagram-concept{font-size:10px}.diagram-node{gap:12px}.diagram-node-tag{display:none}.diagram-node strong{font-size:15px}.diagram-node>div>span{font-size:12px}.diagram-connector{padding-left:45px}.diagram-connector code{font-size:10px}.diagram-network{font-size:8px}.diagram-settlement{padding:16px 12px;gap:12px}.diagram-settlement strong{font-size:15px}.diagram-settlement>div>span{font-size:11px}.diagram-footnote{font-size:11px;text-align:center}}
+
+/* Product sections retained below the original centered hero. */
+.policy-section,.protocol-developer{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:100px;padding-block:100px;border-bottom:1px solid var(--border)}
+.protocol-section-copy{min-width:0}
+.protocol-section-copy h2{font-size:clamp(34px,3.6vw,48px);font-weight:520;letter-spacing:-.045em;line-height:1.12;margin-top:22px}
+.protocol-section-copy>p{font-size:16px;line-height:1.75;margin-top:24px;max-width:430px}
+.protocol-section-copy>.editorial-link{margin-top:24px}
+.policy-benefits{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:17px}
+.policy-benefits li{display:flex;align-items:center;gap:10px;font-size:14px}
+.policy-benefits svg{color:var(--accent);flex-shrink:0}
+.budget-example{margin:0;border:1px solid var(--border);border-radius:12px;padding:26px;background:var(--surface);min-width:0}
+.budget-example figcaption{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:22px;border-bottom:1px solid var(--border);font-size:13px}
+.example-label{font:9px 'Geist Mono Variable',monospace;color:var(--muted);letter-spacing:.06em}
+.budget-provider{display:flex;align-items:center;gap:12px;margin-top:24px}
+.budget-provider>div:nth-child(2){flex:1}.budget-provider strong{display:block;font-size:14px;font-weight:500}
+.budget-provider>div>span{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.policy-enabled{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--success)}
+.budget-amount{margin-top:30px}.budget-amount strong{display:block;font:500 32px 'Geist Mono Variable',monospace;letter-spacing:-.06em}
+.budget-amount strong>span{font-size:16px;color:var(--muted);font-weight:400;letter-spacing:-.03em}
+.budget-amount>span{display:block;font-size:12px;color:var(--muted);margin-top:8px}
+.budget-meter{height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:20px}.budget-meter>span{display:block;width:32%;height:100%;background:var(--accent)}
+.budget-settings{margin:25px 0 0}.budget-settings>div{display:flex;justify-content:space-between;align-items:baseline;gap:18px;padding-block:12px;border-bottom:1px solid var(--border);font-size:12px}
+.budget-settings dt{color:var(--muted)}.budget-settings dd{margin:0;text-align:right}.example-disclaimer{font-size:11px;line-height:1.7;margin-top:20px}
+.integration-sequence{list-style:none;padding:0;margin:30px 0 0;display:grid;gap:22px}.integration-sequence li{display:flex;gap:16px}
+.integration-sequence li>span{font:11px 'Geist Mono Variable',monospace;color:var(--accent);padding-top:3px}
+.integration-sequence strong{font-size:14px;font-weight:550}.integration-sequence p{font-size:13px;line-height:1.6;margin-top:4px}
+.protocol-code{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;min-width:0}
+.protocol-code-heading{display:flex;justify-content:space-between;gap:12px;padding:23px;font-size:10px;color:var(--muted)}
+.protocol-code .code-block{border:0;border-radius:0;background:var(--bg);margin:0}
+.protocol-code .code-block header{align-items:center;font-size:12px;padding:10px 20px}
+.protocol-code .code-block header .button{min-height:44px;font-size:12px;padding-inline:10px}
+.protocol-code .code-block pre{font-size:13px;line-height:1.9;padding:24px 18px}
+.protocol-code>p{display:flex;align-items:center;gap:8px;padding:20px 23px;font-size:11px;border-top:1px solid var(--border)}
+.protocol-code .status-dot{background:var(--subtle);flex-shrink:0}
+.protocol-release-strip{display:grid;grid-template-columns:1fr 2fr;gap:60px;padding-block:64px;border-bottom:1px solid var(--border)}
+.protocol-release-strip h2{font-size:26px;font-weight:520;letter-spacing:-.04em;margin-top:18px;line-height:1.2}
+.protocol-release-strip .editorial-link{margin-top:12px;font-size:13px}
+.protocol-release-strip ol{display:grid;grid-template-columns:repeat(3,1fr);list-style:none;padding:0;margin:0;gap:30px}
+.protocol-release-strip li{border-top:1px solid var(--border);padding-top:18px}
+.release-state{font:10px 'Geist Mono Variable',monospace;color:var(--accent);letter-spacing:.03em}
+.release-state.live{color:var(--success)}.release-state.planned{color:var(--muted)}
+.protocol-release-strip strong{display:block;font-size:15px;line-height:1.5;margin-top:16px;font-weight:500}
+.protocol-release-strip p{font-size:13px;line-height:1.7;margin-top:10px}
+.protocol-close{padding-block:88px;display:flex;justify-content:space-between;align-items:center;gap:40px}
+.protocol-close h2{font-size:clamp(34px,3.6vw,48px);font-weight:520;letter-spacing:-.045em;margin-top:20px}
+.protocol-close>div:last-child{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.protocol-close .button{min-height:48px;font-size:14px;padding-inline:20px}
+.diagram-connector>span{top:0;animation:payment-packet 3.6s linear infinite}
+.diagram-connector:nth-of-type(4)>span{animation-delay:1.8s}
+@keyframes payment-packet{0%{transform:translateY(0);opacity:0}12%{opacity:1}88%{opacity:1}100%{transform:translateY(68px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.diagram-connector>span{animation:none;top:50%}}
+@media(max-width:1050px){.policy-section,.protocol-developer{gap:50px}.protocol-release-strip{gap:36px}}
+@media(max-width:800px){.policy-section,.protocol-developer{grid-template-columns:1fr;gap:36px;padding-block:64px}.protocol-section-copy h2{font-size:40px}.budget-example,.protocol-code{max-width:580px;width:100%}.protocol-release-strip{grid-template-columns:1fr;gap:28px;padding-block:50px}.protocol-close{align-items:flex-start;flex-direction:column;padding-block:64px;gap:28px}}
+@media(max-width:480px){.protocol-section-copy h2{font-size:34px}.budget-example{padding:20px}.budget-example figcaption{align-items:flex-start;flex-direction:column;gap:8px}.budget-provider{gap:8px}.budget-provider strong{font-size:12px}.policy-enabled{font-size:10px}.budget-amount strong{font-size:29px}.budget-amount strong>span{font-size:14px}.protocol-code-heading{padding:18px;font-size:9px}.protocol-code .code-block header{padding:8px 14px;font-size:10px}.protocol-code .code-block pre{font-size:11px;padding:20px 12px}.protocol-code>p{font-size:10px;padding:17px 15px}.protocol-release-strip ol{grid-template-columns:1fr;gap:24px}.protocol-release-strip li{display:grid;grid-template-columns:100px 1fr;gap:7px 12px}.protocol-release-strip strong{margin:0;font-size:14px}.protocol-release-strip p{grid-column:2;margin:0;font-size:13px}.release-state{font-size:9px;padding-top:5px}.protocol-close h2{font-size:34px}.protocol-close>div:last-child{gap:16px}}
+
+/* Explain the flow beside the diagram before spending controls. */
+.payment-flow-section{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:80px;padding-block:40px 96px;border-bottom:1px solid var(--border)}
+.payment-flow-section .protocol-diagram{width:100%}
+.payment-flow-section .protocol-section-copy>p+p{font-size:14px}
+@media(max-width:1050px){.payment-flow-section{gap:40px}}
+@media(max-width:800px){.payment-flow-section{grid-template-columns:1fr;gap:32px;padding-block:16px 64px}.payment-flow-section .protocol-diagram{max-width:580px}}
+
+
+/* Match the explanation column to the full-size payment diagram. */
+.payment-flow-section{align-items:stretch}
+.payment-flow-copy{display:flex;flex-direction:column;justify-content:space-between;gap:30px;padding-block:8px}
+.payment-flow-copy h2{margin-top:22px}
+.payment-flow-description{max-width:430px}
+.payment-flow-description p{font-size:16px;line-height:1.75}
+.payment-flow-description p+p{font-size:14px;margin-top:24px}
+.payment-flow-copy>.editorial-link{align-self:flex-start;margin-top:0}
+@media(max-width:800px){.payment-flow-copy{justify-content:flex-start;gap:24px;padding-block:0}}
