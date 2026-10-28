@@ -15,7 +15,7 @@ for(let start=0;start<manifest.length;start+=4){
  const html=await response.text();const title=decode(html.match(/<title>([\s\S]*?)<\/title>/)?.[1]||'');
  assert.ok(title.includes(route.title),path+' has wrong or missing title: '+title);
  const headings=[...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map(match=>decode(match[1].replace(/<[^>]*>/g,'')));
- assert.ok(headings.some(heading=>heading.includes(route.id==='home'?'Give agents a budget.':route.title)),path+' has no route heading');
+ assert.ok(headings.some(heading=>heading.includes(route.id==='home'?'The payment layer':route.title)),path+' has no route heading');
  assert.ok(html.includes('name="description"'),path+' has no description');
  assert.ok(html.includes('id="main-content"'),path+' has no main landmark');
  if(route.area==='app'&&process.env.WEBSITE_EXPECT_MISSING_CONFIG==='1')assert.ok(html.includes('Missing config: NEXT_PUBLIC_FACTORY_ADDRESS'),path+' missing no-env config state');

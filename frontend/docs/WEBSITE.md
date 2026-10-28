@@ -56,7 +56,7 @@ All active tokens live in frontend/src/app/globals.css, with matching Tailwind a
 | Background/surface | --bg, --surface, --surface-raised, --surface-hover |
 | Typography | Geist Variable for UI, Geist Mono Variable for code/addresses; local @fontsource assets with font-display swap |
 | Foreground | --text, --muted, --subtle |
-| Accent | Mint in dark mode, deep green in light mode; --accent, --accent-ink, --accent-soft |
+| Accent | Periwinkle in dark mode, indigo in light mode; --accent, --accent-ink, --accent-soft |
 | Semantics | --success, --warn, --danger |
 | Layout | 8px spacing rhythm; --space-1 through --space-8; 1200px marketing maximum |
 | Shape | --radius-sm 6px, --radius 12px, --radius-lg 20px; --shadow |
@@ -191,3 +191,13 @@ The MDX content source content/docs/** and compilation/search pipeline are delib
 | /app/org/teams/[teamId] | Team details |
 | /app/audit | Audit activity |
 | /app/profile/[id] | Public profile |
+
+## Dark Veil and editorial landing layout
+
+The landing now uses the React Bits Dark Veil component (native WebGL2) with the upstream MIT + Commons Clause license retained in frontend/src/web/components/backgrounds/REACT_BITS_LICENSE.md. Only the required component is included; no extra graphics package is installed.
+
+The layout has a centered typographic hero, a full-width payment rail, asymmetric control/code sections, an open roadmap and a larger closing CTA. Shared marketing/docs footers use grouped navigation. All app routes and wallet behavior remain unchanged.
+
+The hero background is lazy-loaded, confined to the top of the landing and paused outside the viewport or when the document is hidden. Animation runs automatically at speed 1.5 (three times the upstream default), without a pause control or custom frame-rate cap. Local changes include live reduced-motion support, safe WebGL fallback, resizable texture allocation and Strict Mode-safe cleanup. The site palette remains graphite/periwinkle in dark mode and cool-white/indigo in light mode.
+
+The voucher sample is copied from contract/src/AgentWalletV3.sol; SDK/middleware integrations are explicitly marked in progress. No usage metrics, customer claims or balances are invented.

@@ -1,4 +1,4 @@
-import { LandingFoundation } from '@/web/components/foundation-page';
+import { LandingFoundation } from '@/web/components/landing-page';
 import { pageMetadata } from '@/web/lib/metadata';
 
 export const metadata = pageMetadata('home');
