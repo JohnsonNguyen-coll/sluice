@@ -1,0 +1,4 @@
+import { routeHref } from '../lib/routes';
+import { ButtonLink, EmptyState, Skeleton } from './ui';
+export function PageLoading({ label = 'Loading page' }: { label?: string }) { return <div className="page-loading" role="status"><span className="sr-only">{label}</span><Skeleton className="skeleton-label" /><Skeleton className="skeleton-heading" /><Skeleton /><div className="grid-three"><Skeleton className="skeleton-card" /><Skeleton className="skeleton-card" /><Skeleton className="skeleton-card" /></div></div>; }
+export function NotFoundState() { return <div className="state-page"><p className="eyebrow">404 · ROUTE NOT FOUND</p><EmptyState title="This route ends here." description="The page or record could not be found. Check the address or return to the overview." action={<ButtonLink href={routeHref('home')}>Back to Sluice</ButtonLink>} /></div>; }

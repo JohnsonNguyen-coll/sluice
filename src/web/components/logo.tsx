@@ -1,0 +1,3 @@
+/** Sluice mark: two gated channels forming an S. Keep geometry in sync with public/brand SVG assets. */
+const band = "M69 14 110 38Q113 40 110 42L91 53Q88 54.5 85.5 53L56 36Q50 32.5 44 36L41 38Q36 41 36 47Q36 53 41 56L70 73Q72 74 72 76V86Q72 89 69 87.5L19 58.5Q16 57 16 54V43Q16 40 19 38L59 14Q64 11 69 14Z";
+export function SluiceMark() { return <svg viewBox="0 0 128 128" fill="currentColor" aria-hidden="true" focusable="false"><path d={band}/><path d={band} transform="rotate(180 64 64)"/></svg>; }

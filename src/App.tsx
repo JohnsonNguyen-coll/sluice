@@ -1,4 +1,5 @@
-import { ConnectKitButton } from 'connectkit'
+'use client';
+import { WalletControl as ConnectKitButton } from './web/components/wallet-control'
 import { useAccount } from 'wagmi'
 import { AlertTriangle, Wallet, Database, Activity, Shield, Zap, ExternalLink } from 'lucide-react'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -24,16 +25,7 @@ export default function App() {
 
 // ─── Fonts ───────────────────────────────────────────────────────────────────
 
-const FONT_LINK = (
-  <>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-  </>
-)
+const FONT_LINK = null
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
@@ -354,7 +346,7 @@ function ConnectedView({ address }: { address: string }) {
             </a>
           ) : (
             <span style={{ color: '#f59e0b', fontSize: 13 }}>
-              Set VITE_FACTORY_ADDRESS to enable
+              Set NEXT_PUBLIC_FACTORY_ADDRESS to enable
             </span>
           )}
         </InfoCard>
@@ -457,7 +449,7 @@ function ConnectedView({ address }: { address: string }) {
               Deploy AgentWalletFactory to get started
             </p>
             <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px', lineHeight: 1.6 }}>
-              Run the deploy script, then set <code style={{ fontFamily: 'monospace', color: '#93c5fd' }}>VITE_FACTORY_ADDRESS</code> in your{' '}
+              Run the deploy script, then set <code style={{ fontFamily: 'monospace', color: '#93c5fd' }}>NEXT_PUBLIC_FACTORY_ADDRESS</code> in your{' '}
               <code style={{ fontFamily: 'monospace', color: '#93c5fd' }}>.env</code> file to enable full dashboard functionality.
             </p>
             <code

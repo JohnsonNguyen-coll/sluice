@@ -1,0 +1,391 @@
+export const routeManifest = [
+  {
+    "area": "marketing",
+    "id": "home",
+    "path": "/",
+    "title": "Payment infrastructure for AI agents",
+    "description": "Prefunded wallets, spending policies and off-chain vouchers. Built for agents on Arc."
+  },
+  {
+    "area": "marketing",
+    "id": "how",
+    "path": "/how-it-works",
+    "title": "How it works",
+    "description": "Follow a payment from a funded wallet to a signed voucher and batched settlement."
+  },
+  {
+    "area": "marketing",
+    "id": "security",
+    "path": "/security",
+    "title": "Security by design",
+    "description": "Understand spending controls, trust boundaries and the current audit status."
+  },
+  {
+    "area": "marketing",
+    "id": "pricing",
+    "path": "/pricing",
+    "title": "Transparent protocol fees",
+    "description": "Protocol fees are factory parameters, snapshotted when a wallet is created."
+  },
+  {
+    "area": "marketing",
+    "id": "roadmap",
+    "path": "/roadmap",
+    "title": "A protocol built in stages",
+    "description": "Track the payment core, multi-token contracts and trust layer without treating plans as shipped features."
+  },
+  {
+    "area": "marketing",
+    "id": "changelog",
+    "path": "/changelog",
+    "title": "Changelog",
+    "description": "Source changes and release notes for the AgentPay protocol and web application."
+  },
+  {
+    "area": "marketing",
+    "id": "status",
+    "path": "/status",
+    "title": "Network & deployments",
+    "description": "Arc Testnet configuration and recorded contract deployments."
+  },
+  {
+    "area": "docs",
+    "id": "docs",
+    "path": "/docs",
+    "title": "Documentation",
+    "description": "Build an integration with the AgentPay payment protocol."
+  },
+  {
+    "area": "docs",
+    "id": "docs-quickstart-provider",
+    "path": "/docs/quickstart/provider",
+    "title": "Provider quickstart",
+    "description": "Reference and implementation status for provider quickstart in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-quickstart-agent",
+    "path": "/docs/quickstart/agent",
+    "title": "Agent quickstart",
+    "description": "Reference and implementation status for agent quickstart in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-wallets",
+    "path": "/docs/concepts/wallets",
+    "title": "Agent wallets",
+    "description": "Reference and implementation status for agent wallets in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-vouchers",
+    "path": "/docs/concepts/vouchers",
+    "title": "Payment vouchers",
+    "description": "Reference and implementation status for payment vouchers in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-policies",
+    "path": "/docs/concepts/policies",
+    "title": "Spending policies",
+    "description": "Reference and implementation status for spending policies in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-settlement",
+    "path": "/docs/concepts/settlement",
+    "title": "Batch settlement",
+    "description": "Reference and implementation status for batch settlement in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-receipts",
+    "path": "/docs/concepts/receipts",
+    "title": "Call receipts",
+    "description": "Reference and implementation status for call receipts in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-disputes",
+    "path": "/docs/concepts/disputes",
+    "title": "Disputes & refunds",
+    "description": "Reference and implementation status for disputes & refunds in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-reputation",
+    "path": "/docs/concepts/reputation",
+    "title": "Identity & reputation",
+    "description": "Reference and implementation status for identity & reputation in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-concepts-organizations",
+    "path": "/docs/concepts/organizations",
+    "title": "Organizations",
+    "description": "Reference and implementation status for organizations in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-sdk-client",
+    "path": "/docs/sdk/client",
+    "title": "AgentPay client",
+    "description": "Reference and implementation status for agentpay client in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-sdk-errors",
+    "path": "/docs/sdk/errors",
+    "title": "SDK errors",
+    "description": "Reference and implementation status for sdk errors in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-sdk-stores",
+    "path": "/docs/sdk/stores",
+    "title": "Receipt stores",
+    "description": "Reference and implementation status for receipt stores in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-sdk-signers",
+    "path": "/docs/sdk/signers",
+    "title": "Signers",
+    "description": "Reference and implementation status for signers in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-middleware-express",
+    "path": "/docs/middleware/express",
+    "title": "Express middleware",
+    "description": "Reference and implementation status for express middleware in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-middleware-config",
+    "path": "/docs/middleware/config",
+    "title": "Middleware configuration",
+    "description": "Reference and implementation status for middleware configuration in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-middleware-settler",
+    "path": "/docs/middleware/settler",
+    "title": "The settler",
+    "description": "Reference and implementation status for the settler in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-contracts-addresses",
+    "path": "/docs/contracts/addresses",
+    "title": "Contract addresses",
+    "description": "Reference and implementation status for contract addresses in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-contracts-agent-wallet",
+    "path": "/docs/contracts/agent-wallet",
+    "title": "AgentWallet",
+    "description": "Reference and implementation status for agentwallet in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-contracts-factory",
+    "path": "/docs/contracts/factory",
+    "title": "Wallet factory",
+    "description": "Reference and implementation status for wallet factory in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-contracts-dispute-vault",
+    "path": "/docs/contracts/dispute-vault",
+    "title": "DisputeVault",
+    "description": "Reference and implementation status for disputevault in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-contracts-registries",
+    "path": "/docs/contracts/registries",
+    "title": "Registries",
+    "description": "Reference and implementation status for registries in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-guides-multi-token",
+    "path": "/docs/guides/multi-token",
+    "title": "Multi-token payments",
+    "description": "Reference and implementation status for multi-token payments in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-guides-subscriptions",
+    "path": "/docs/guides/subscriptions",
+    "title": "Subscriptions",
+    "description": "Reference and implementation status for subscriptions in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-guides-approvals",
+    "path": "/docs/guides/approvals",
+    "title": "Approvals",
+    "description": "Reference and implementation status for approvals in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-guides-auditing",
+    "path": "/docs/guides/auditing",
+    "title": "Auditing",
+    "description": "Reference and implementation status for auditing in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-security-threat-model",
+    "path": "/docs/security/threat-model",
+    "title": "Threat model",
+    "description": "Reference and implementation status for threat model in AgentPay."
+  },
+  {
+    "area": "docs",
+    "id": "docs-faq",
+    "path": "/docs/faq",
+    "title": "Frequently asked questions",
+    "description": "Answers about wallets, vouchers, settlement and the current implementation."
+  },
+  {
+    "area": "app",
+    "id": "overview",
+    "path": "/app",
+    "title": "Overview",
+    "description": "Your workspace for agent payments."
+  },
+  {
+    "area": "app",
+    "id": "wallets",
+    "path": "/app/wallets",
+    "title": "Agent wallets",
+    "description": "Inspect a wallet by address or connect to access your account."
+  },
+  {
+    "area": "app",
+    "id": "wallet-new",
+    "path": "/app/wallets/new",
+    "title": "Create an agent wallet",
+    "description": "Separate wallet ownership from the agent signing key."
+  },
+  {
+    "area": "app",
+    "id": "wallet",
+    "path": "/app/wallets/[address]",
+    "title": "Wallet overview",
+    "description": "Inspect the selected wallet without connecting an account."
+  },
+  {
+    "area": "app",
+    "id": "wallet-budgets",
+    "path": "/app/wallets/[address]/budgets",
+    "title": "Provider budgets",
+    "description": "Review provider-specific spending allowances."
+  },
+  {
+    "area": "app",
+    "id": "wallet-activity",
+    "path": "/app/wallets/[address]/activity",
+    "title": "Wallet activity",
+    "description": "Review payments and wallet events."
+  },
+  {
+    "area": "app",
+    "id": "wallet-settings",
+    "path": "/app/wallets/[address]/settings",
+    "title": "Wallet settings",
+    "description": "Wallet controls, signer rotation and pause settings."
+  },
+  {
+    "area": "app",
+    "id": "provider",
+    "path": "/app/provider",
+    "title": "Provider overview",
+    "description": "Your provider integration and payment operations."
+  },
+  {
+    "area": "app",
+    "id": "provider-settlements",
+    "path": "/app/provider/settlements",
+    "title": "Settlements",
+    "description": "Review settlement batches and held funds."
+  },
+  {
+    "area": "app",
+    "id": "provider-integration",
+    "path": "/app/provider/integration",
+    "title": "Provider integration",
+    "description": "Integration configuration and implementation status."
+  },
+  {
+    "area": "app",
+    "id": "disputes",
+    "path": "/app/disputes",
+    "title": "Disputes",
+    "description": "Track payment disputes and refund deadlines."
+  },
+  {
+    "area": "app",
+    "id": "dispute",
+    "path": "/app/disputes/[id]",
+    "title": "Dispute details",
+    "description": "Evidence, responses and resolution for a settlement dispute."
+  },
+  {
+    "area": "app",
+    "id": "approvals",
+    "path": "/app/approvals",
+    "title": "Approvals",
+    "description": "Review requests that need an owner decision."
+  },
+  {
+    "area": "app",
+    "id": "approval",
+    "path": "/app/approvals/[id]",
+    "title": "Approval details",
+    "description": "Inspect an approval request before taking action."
+  },
+  {
+    "area": "app",
+    "id": "org",
+    "path": "/app/org",
+    "title": "Organization",
+    "description": "Organization controls are planned and are not available on-chain."
+  },
+  {
+    "area": "app",
+    "id": "team",
+    "path": "/app/org/teams/[teamId]",
+    "title": "Team details",
+    "description": "Team budgets and membership are planned."
+  },
+  {
+    "area": "app",
+    "id": "audit",
+    "path": "/app/audit",
+    "title": "Audit activity",
+    "description": "Share a filtered activity view using its URL."
+  },
+  {
+    "area": "app",
+    "id": "profile",
+    "path": "/app/profile/[id]",
+    "title": "Public profile",
+    "description": "Inspect an agent or provider identity and verifiable reputation data."
+  }
+] as const;
+export type RouteId = typeof routeManifest[number]['id'];
+export type RouteEntry = typeof routeManifest[number];
+export function routeById(id: RouteId) { const route = routeManifest.find(item => item.id === id); if (!route) throw new Error('Unknown route'); return route; }
+export function routeHref(id: RouteId) { return routeById(id).path; }
+export const routes = {
+  wallet: (address: string, section: 'overview' | 'budgets' | 'activity' | 'settings' = 'overview') => '/app/wallets/' + encodeURIComponent(address) + (section === 'overview' ? '' : '/' + section),
+  dispute: (id: string) => '/app/disputes/' + encodeURIComponent(id),
+  approval: (id: string) => '/app/approvals/' + encodeURIComponent(id),
+  team: (id: string) => '/app/org/teams/' + encodeURIComponent(id),
+  profile: (id: string) => '/app/profile/' + encodeURIComponent(id),
+};

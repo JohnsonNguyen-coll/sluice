@@ -50,3 +50,7 @@ Desktop.ini
 
 # Keep source, docs, deployments/, contracts/contract-metadata/,
 # .gas-snapshot and tool version files under version control.
+
+# Next.js build output and local platform state
+.next/
+.vercel/

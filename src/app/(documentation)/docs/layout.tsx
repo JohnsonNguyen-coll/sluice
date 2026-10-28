@@ -1,0 +1,4 @@
+import type { ReactNode } from 'react';
+import { PublicHeader, PublicFooter, DocsSearch } from '@/web/components/public-shell';
+import { DocsNavigation, Breadcrumbs, MobileNavigation } from '@/web/components/navigation';
+export default function DocumentationLayout({children}:{children:ReactNode}) { return <><PublicHeader /><div className="docs-layout"><aside className="docs-sidebar"><DocsSearch /><DocsNavigation /></aside><main id="main-content" className="docs-main"><MobileNavigation docs /><Breadcrumbs />{children}</main><aside className="docs-toc"><p className="eyebrow">ON THIS PAGE</p><nav aria-label="On this page"><a href="#implementation-status">Implementation status</a><a href="#next-steps">Continue exploring</a></nav><p className="small muted">Content preview<br />Full docs system is next.</p></aside></div><PublicFooter /></>; }

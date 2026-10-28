@@ -1,0 +1,12 @@
+'use client';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { routes } from '../lib/routes';
+import { Button } from './ui';
+export function AddressLookup() {
+ const router=useRouter(); const [address,setAddress]=useState(''); const [error,setError]=useState('');
+ return <form className="address-lookup card" onSubmit={event=>{event.preventDefault();if(!/^0x[0-9a-fA-F]{40}$/.test(address.trim())){setError('Enter a valid 0x address with 40 hexadecimal characters.');return;}router.push(routes.wallet(address.trim()));}}><label htmlFor="wallet-address">Inspect an agent wallet</label><p className="small muted">Paste an address to open its read-only view. No wallet connection required.</p><div><input id="wallet-address" value={address} onChange={event=>{setAddress(event.target.value);setError('');}} placeholder="0x…" autoComplete="off" spellCheck={false} aria-invalid={!!error} aria-describedby={error?'address-error':undefined} /><Button type="submit">Open wallet</Button></div>{error&&<p id="address-error" role="alert">{error}</p>}</form>;
+}
+export function WalletTabs({address}:{address:string}) { const pathname=usePathname();return <nav className="tabs" aria-label="Wallet sections">{(['overview','budgets','activity','settings'] as const).map(section=><Link key={section} href={routes.wallet(address,section)} aria-current={pathname===routes.wallet(address,section)?'page':undefined}>{section.charAt(0).toUpperCase()+section.slice(1)}</Link>)}</nav>; }
+export function UrlFilters() { const params=useSearchParams();return <form key={params.toString()} method="get" className="filter-bar card"><label>Event type<select name="type" defaultValue={params.get('type')||'all'}><option value="all">All events</option><option value="settlement">Settlements</option><option value="dispute">Disputes</option></select></label><label>Sort order<select name="sort" defaultValue={params.get('sort')||'newest'}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label><label>From<input type="date" name="from" defaultValue={params.get('from')||''}/></label><label>To<input type="date" name="to" defaultValue={params.get('to')||''}/></label><Button type="submit" variant="secondary">Apply view</Button><p className="small muted">Filters are saved in the URL. Live event data and export will be added during integration.</p></form>; }
