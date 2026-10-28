@@ -1,12 +1,11 @@
+import { PublicHeader } from './public-header';
+export { PublicHeader } from './public-header';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Brand, ButtonLink } from './ui';
-import { PublicNavigation } from './navigation';
-import { ThemeToggle } from './theme';
+import { Brand } from './ui';
 import { CommandPalette } from './command-palette';
 import { routeHref, type RouteId } from '../lib/routes';
 const copyrightYear = new Date().getUTCFullYear();
-export function PublicHeader() { return <header className="site-header"><div className="header-inner"><Brand /><div className="header-navigation"><PublicNavigation /></div><div className="header-actions"><ThemeToggle /><ButtonLink href={routeHref('overview')}>Launch app</ButtonLink></div></div><details className="mobile-public-nav"><summary>Explore Sluice</summary><PublicNavigation /></details></header>; }
 const footerGroups: { title: string; links: { id: RouteId; label: string }[] }[] = [
  { title: 'Build', links: [{id:'docs',label:'Documentation'},{id:'docs-quickstart-agent',label:'Agent quickstart'},{id:'docs-quickstart-provider',label:'Provider quickstart'},{id:'docs-contracts-addresses',label:'Contract addresses'}]},
  { title: 'Protocol', links: [{id:'how',label:'How it works'},{id:'security',label:'Security'},{id:'pricing',label:'Pricing'},{id:'roadmap',label:'Roadmap'}]},

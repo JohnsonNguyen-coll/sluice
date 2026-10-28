@@ -9,11 +9,11 @@ const appItems: { id: RouteId; label: string; icon: typeof Wallet }[] = [
  { id: 'approvals', label: 'Approvals', icon: ShieldCheck }, { id: 'org', label: 'Organization', icon: Building2 },
  { id: 'audit', label: 'Audit activity', icon: ListFilter },
 ];
-export function AppNavigation() {
+export function AppNavigation({onNavigate}:{onNavigate?:()=>void}={}) {
  const pathname = usePathname();
  return <nav aria-label="App navigation" className="app-nav">{appItems.map(({ id, label, icon: Icon }) => {
  const path = routeHref(id); const active = pathname === path || (path !== routeHref('overview') && pathname.startsWith(path + '/'));
- return <Link key={id} href={path} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}><Icon size={18} aria-hidden="true" />{label}{id === 'org' && <span className="nav-note">Planned</span>}</Link>;
+ return <Link key={id} href={path} onClick={onNavigate} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}><Icon size={18} aria-hidden="true" />{label}{id === 'org' && <span className="nav-note">Planned</span>}</Link>;
  })}</nav>;
 }
 export function DocsNavigation() {

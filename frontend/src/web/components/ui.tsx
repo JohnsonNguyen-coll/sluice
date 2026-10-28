@@ -5,7 +5,7 @@ import { ArrowUpRight, ArrowRight, ShieldCheck, Layers3 } from 'lucide-react';
 import { routeHref } from '../lib/routes';
 
 export function Brand() {
-  return <Link className="brand" href={routeHref('home')} aria-label="Sluice home"><span className="brand-mark" aria-hidden="true"><SluiceMark /></span>Sluice<span className="brand-protocol">AGENTPAY</span></Link>;
+  return <Link className="brand" href={routeHref('home')} aria-label="Sluice home"><span className="brand-mark" aria-hidden="true"><SluiceMark /></span>Sluice</Link>;
 }
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'accent' | 'success' | 'warning' }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;

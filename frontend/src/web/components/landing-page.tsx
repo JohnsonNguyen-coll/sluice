@@ -13,14 +13,23 @@ const voucher = `struct Voucher {
     uint64  expiry;
 }`;
 function PaymentDiagram() {
- return <figure className="protocol-diagram" aria-label="Protocol concept: an agent signs payment vouchers, a provider collects them and settles in batches on Arc.">
-  <figcaption><span className="mono">THE PAYMENT PATH</span><span className="diagram-concept">Protocol concept</span></figcaption>
-  <div className="diagram-node"><div className="diagram-node-icon"><Bot size={23} aria-hidden="true"/></div><div><strong>Your agent</strong><span>Requests an API · checks spending policy</span></div><span className="diagram-node-tag">SDK</span></div>
-  <div className="diagram-connector"><span/><code>EIP-712 signed voucher</code><ArrowRight size={14} aria-hidden="true"/></div>
-  <div className="diagram-node"><div className="diagram-node-icon"><Server size={23} aria-hidden="true"/></div><div><strong>API provider</strong><span>Verifies authorization · returns a response</span></div><span className="diagram-node-tag">API</span></div>
-  <div className="diagram-connector"><span/><code>Collect vouchers → settle a batch</code><ArrowRight size={14} aria-hidden="true"/></div>
-  <div className="diagram-settlement"><Layers3 size={22} aria-hidden="true"/><div><strong>Arc settlement</strong><span>AgentWallet → provider</span></div><span className="diagram-network">ON-CHAIN</span></div>
-  <div className="diagram-footnote"><ShieldCheck size={14} aria-hidden="true"/><span>Funds stay in the wallet until settlement.</span></div>
+ const stages = [
+  { icon: Bot, role: '01 / AGENT', title: 'Your agent', detail: 'Checks the spending policy and signs a payment voucher.', transfer: 'Signed voucher', tag: 'OFF-CHAIN' },
+  { icon: Server, role: '02 / PROVIDER', title: 'API provider', detail: 'Verifies authorization, serves the request and collects vouchers.', transfer: 'Batch settlement', tag: 'OFF-CHAIN' },
+  { icon: Layers3, role: '03 / ARC', title: 'Arc settlement', detail: 'The wallet pays the provider when valid vouchers are redeemed.', tag: 'ON-CHAIN' },
+ ];
+ return <figure className="payment-path" aria-label="Protocol concept: agent to provider to Arc settlement">
+  <figcaption className="sr-only">Payment flow concept</figcaption>
+  <ol className="payment-path-stages">{stages.map(({ icon: Icon, role, title, detail, transfer, tag }) =>
+   <li key={role}>
+    <div className="payment-path-icon"><Icon size={24} strokeWidth={1.5} aria-hidden="true"/></div>
+    {transfer && <div className="payment-path-connection" aria-hidden="true"><span className="payment-path-packet"/><span className="payment-path-transfer">{transfer}<ArrowRight size={12}/></span></div>}
+    <p className="payment-path-role">{role}</p>
+    <h3>{title}</h3>
+    <p className="payment-path-detail">{detail}</p>
+    <span className="payment-path-tag">{tag}</span>
+   </li>
+  )}</ol>
  </figure>;
 }
 
@@ -39,7 +48,6 @@ export function LandingFoundation(){
  return <div className="landing-redesign">
   <VeilBackground/>
   <section className="editorial-hero landing-container" aria-labelledby="landing-title">
-   <Link href={routeHref('status')} className="hero-release"><span className="status-dot"/>Building on Arc Testnet<span className="release-divider"/>Developer preview<ArrowUpRight size={12} aria-hidden="true"/></Link>
    <p className="hero-overline">SLUICE / AGENTPAY PROTOCOL</p>
    <h1 id="landing-title">The payment layer<br/><span>for autonomous agents.</span></h1>
    <p className="hero-summary">Prefund a wallet. Set the spending rules.<br className="desktop-break"/> Let agents pay for APIs with signed off-chain vouchers.</p>
@@ -48,7 +56,7 @@ export function LandingFoundation(){
   </section>
   <div className="landing-container protocol-lower">
    <section className="payment-flow-section" aria-labelledby="payment-flow-heading">
-    <div className="protocol-section-copy payment-flow-copy"><div className="payment-flow-heading-group"><span className="section-index">01 / PAYMENT FLOW</span><h2 id="payment-flow-heading">How payments<br/>move.</h2></div><div className="payment-flow-description"><p>Authorize each API call off-chain. Settle payments together on Arc.</p><p>The agent signs a voucher within its spending policy. The provider verifies it, serves the request and collects vouchers for settlement.</p></div><Link className="editorial-link" href={routeHref('how')}>See how it works<ArrowUpRight size={15} aria-hidden="true"/></Link></div>
+    <div className="payment-flow-header"><div><span className="section-index">01 / PAYMENT FLOW</span><h2 id="payment-flow-heading">How payments move.</h2><p>Authorize each API call off-chain. Settle payments together on Arc.</p></div><Link className="editorial-link" href={routeHref('how')}>See how it works<ArrowUpRight size={15} aria-hidden="true"/></Link></div>
     <PaymentDiagram/>
    </section>
    <section className="policy-section" aria-labelledby="policy-heading">
