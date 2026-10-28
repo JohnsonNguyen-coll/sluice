@@ -4,7 +4,7 @@ Reviewed 2026-10-28. This records source review and local validation, not a depl
 
 ## Current repository
 
-Identity, provider and reputation registries, DisputeVault, V3 wallet/factory and Solidity tests already exist. Their presence does not establish that Phase 3 is complete. The repository has a React/Vite dashboard; the `packages/sdk` and `packages/middleware` directories described in the roadmap are absent. Examples importing those packages are integration sketches, not evidence of a working SDK.
+Identity, provider and reputation registries, DisputeVault, V3 wallet/factory and Solidity tests already exist. Their presence does not establish that Phase 3 is complete. The Next.js frontend lives in `frontend/`; the `packages/sdk` and `packages/middleware` directories described in the roadmap are absent. Examples importing those packages are integration sketches, not evidence of a working SDK.
 
 ## Checkpoint 1: registry hardening
 
@@ -21,7 +21,7 @@ Identity, provider and reputation registries, DisputeVault, V3 wallet/factory an
 1. Implement real SDK/middleware packages and signed receipts, receipt storage, Merkle trees and verification against the V3 contract. A stored root alone does not prove a complete receipt flow.
 2. Review DisputeVault/V3 against the full spec, especially receipt-proof/no-receipt claims, payout/arbiter snapshots, undisputed fund release, deadline boundaries, bond accounting, delisted tokens and paused wallets. Existing V3 code must not be treated as completed merely because current tests pass.
 3. Add the SDK policy/profile/dispute APIs, provider callbacks, dashboard profiles and dispute center. Keep V1/V2 behavior supported.
-4. Deploy fresh V3/registry contracts only after these checks, then record the requested six testnet scenarios with transaction hashes. `deployments/arc-testnet.json` contains only V1/V2, but `contracts/contract-metadata/*.json` records earlier V3/registry deployments and transaction hashes. Those records have not been independently verified here and predate these source changes; non-upgradeable deployed instances do not receive these fixes.
+4. Deploy fresh V3/registry contracts only after these checks, then record the requested six testnet scenarios with transaction hashes. `contract/deployments/arc-testnet.json` contains only V1/V2, but `contract/metadata/*.json` records earlier V3/registry deployments and transaction hashes. Those records have not been independently verified here and predate these source changes; non-upgradeable deployed instances do not receive these fixes.
 5. Complete architecture diagrams, threat model, integration guide, defaults and runbook for the final behavior.
 
 The supplied work order says to stop and show results after registries/tests. This checkpoint follows that boundary; no claim is made that receipts, disputes, UI or testnet e2e are complete.

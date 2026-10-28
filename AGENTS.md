@@ -13,23 +13,23 @@ Sluice AgentPay Core: production payment layer for AI agents. Pay-per-call USDC 
 | Arc Testnet | V1 | `AgentWalletFactory` | `0xdae395f504be412ddfc0646b37ac1840a1462c08` |
 | Arc Testnet | V2 | `AgentWalletFactoryV2` | `0x92f357b256f5fb6a0f7e635a29462601c1cb6547` |
 
-Full deployment record: `deployments/arc-testnet.json`
+Full deployment record: `contract/deployments/arc-testnet.json`
 
 ### Contract Files
 
 | File | Contract | Purpose |
 |---|---|---|
-| `contracts/AgentWalletFactory.sol` | `AgentWalletFactory` | V1 CREATE2 factory, single USDC, fee governance |
-| `contracts/AgentWallet.sol` | `AgentWallet` | V1 per-agent USDC wallet, EIP-712 settlement |
-| `contracts/AgentWalletFactoryV2.sol` | `AgentWalletFactoryV2` | V2 factory, token allowlist, no hardcoded USDC |
-| `contracts/AgentWalletV2.sol` | `AgentWalletV2` | V2 wallet, multi-token, swap adapter, USD daily limits |
-| `contracts/ISwapAdapter.sol` | `ISwapAdapter` | Pluggable swap interface |
-| `contracts/script/Deploy.s.sol` | `DeployScript` | Foundry V1 deploy script |
-| `contracts/test/AgentWallet.t.sol` | Various | V1: 43 unit + fuzz + invariant tests |
-| `contracts/test/AgentWalletV2.*.t.sol` | Various | V2: 79 unit + fuzz + invariant tests (6 files) |
-| `contracts/test/mocks/MockERC20.sol` | `MockERC20` | Mintable ERC-20 for tests |
-| `contracts/test/mocks/MockSwapAdapter.sol` | `MockSwapAdapter` | Configurable rate swap adapter for tests |
-| `contracts/test/mocks/MockFeeOnTransferERC20.sol` | `MockFeeOnTransferERC20` | Fee-on-transfer ERC-20 for deposit rejection tests |
+| `contract/src/AgentWalletFactory.sol` | `AgentWalletFactory` | V1 CREATE2 factory, single USDC, fee governance |
+| `contract/src/AgentWallet.sol` | `AgentWallet` | V1 per-agent USDC wallet, EIP-712 settlement |
+| `contract/src/AgentWalletFactoryV2.sol` | `AgentWalletFactoryV2` | V2 factory, token allowlist, no hardcoded USDC |
+| `contract/src/AgentWalletV2.sol` | `AgentWalletV2` | V2 wallet, multi-token, swap adapter, USD daily limits |
+| `contract/src/ISwapAdapter.sol` | `ISwapAdapter` | Pluggable swap interface |
+| `contract/script/Deploy.s.sol` | `DeployScript` | Foundry V1 deploy script |
+| `contract/test/AgentWallet.t.sol` | Various | V1: 43 unit + fuzz + invariant tests |
+| `contract/test/AgentWalletV2.*.t.sol` | Various | V2: 79 unit + fuzz + invariant tests (6 files) |
+| `contract/test/mocks/MockERC20.sol` | `MockERC20` | Mintable ERC-20 for tests |
+| `contract/test/mocks/MockSwapAdapter.sol` | `MockSwapAdapter` | Configurable rate swap adapter for tests |
+| `contract/test/mocks/MockFeeOnTransferERC20.sol` | `MockFeeOnTransferERC20` | Fee-on-transfer ERC-20 for deposit rejection tests |
 
 ### Test Status
 
@@ -73,8 +73,8 @@ See `docs/DECISIONS.md` for full rationale.
 
 | File | Purpose |
 |---|---|
-| `examples/minimal-provider.ts` | Express provider with agentpay() middleware |
-| `examples/minimal-agent.ts` | Agent with AgentPayClient drop-in fetch |
+| `backend/examples/minimal-provider.ts` | Express provider with agentpay() middleware |
+| `backend/examples/minimal-agent.ts` | Agent with AgentPayClient drop-in fetch |
 
 ## Env Vars (for deployment)
 
@@ -93,9 +93,17 @@ do not infer completion from existing contract files or historical test counts.
 
 The SDK (`packages/sdk`) and middleware (`packages/middleware`) directories are
 absent in this checkout. Receipts and end-to-end integrations still require work.
-Earlier V3 deployment records exist in `contracts/contract-metadata`, while
-`deployments/arc-testnet.json` currently lists only V1/V2. Non-upgradeable deployed
+Earlier V3 deployment records exist in `contract/metadata`, while
+`contract/deployments/arc-testnet.json` currently lists only V1/V2. Non-upgradeable deployed
 instances do not receive local source fixes; new deployments are required.
 
 The supplied Phase 3 work order requires stopping to show results after the
 registry/test checkpoint, before proceeding to receipts.
+
+## Workspace layout
+
+- `contract/`: Solidity in `src/`, Foundry tests/scripts/lib, deployment tooling, metadata and deployment records.
+- `frontend/`: Next.js app, public assets, web config/tests and `docs/WEBSITE.md`.
+- `backend/`: reserved backend source plus the original integration examples; no runnable server yet.
+- Run web commands from the repository root or `frontend/`; run Foundry directly from `contract/`.
+- Canonical generated chain facts are in `contract/config/onchain-facts.ts`; the frontend keeps a re-export compatibility entry point.

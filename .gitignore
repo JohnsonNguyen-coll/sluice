@@ -1,7 +1,8 @@
-# Dependencies (keep bun.lock and vendored lib/forge-std)
+# Workspace dependencies and local tooling
 node_modules/
+/.tools/
 
-# Local environment and credentials (keep safe example templates)
+# Private environment and credentials
 .env
 .env.*
 !.env.example
@@ -9,10 +10,12 @@ node_modules/
 !.env.template
 *.pem
 *.key
-/keystore/
-/keystores/
+keystore/
+keystores/
 
-# Frontend builds, tooling caches and test reports
+# Frontend builds, caches and reports
+.next/
+.vercel/
 dist/
 .vite/
 *.tsbuildinfo
@@ -20,25 +23,19 @@ coverage/
 playwright-report/
 test-results/
 
-# Foundry generated artifacts and transaction caches
-/contracts/out/
-/contracts/cache/
-/contracts/broadcast/
-/out/
-/cache/
-/broadcast/
+# Foundry build and transaction output in contract/
+out/
+cache/
+broadcast/
+.compass/
+.compass-verify/
+deploy.lock.json
 
-# Local deployment sessions and verification receipts
-/.compass/
-/contracts/.compass-verify/
-/contracts/deploy.lock.json
-
-# Local tools, downloaded packages and runtime logs
-/.tools/
+# Runtime logs
 *.log
-/console.jsonl
+console.jsonl
 
-# Editor and operating-system files
+# Editor and OS files
 .idea/
 .vscode/
 *.swp
@@ -48,9 +45,4 @@ test-results/
 Thumbs.db
 Desktop.ini
 
-# Keep source, docs, deployments/, contracts/contract-metadata/,
-# .gas-snapshot and tool version files under version control.
-
-# Next.js build output and local platform state
-.next/
-.vercel/
+# Keep contract/src, test, lib, metadata, deployments and .gas-snapshot.

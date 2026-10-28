@@ -26,7 +26,7 @@ sequenceDiagram
 
 ## Components
 
-### Contracts (`contracts/`)
+### Contracts (`contract/src/`)
 
 | Contract | Role |
 |---|---|
