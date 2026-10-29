@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "dependencies": {
-    "viem": "2.57.5"
+    "viem": "2.57.5",
+    "@sluice/sdk": "workspace:*",
+    "@sluice/middleware": "workspace:*"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.13",

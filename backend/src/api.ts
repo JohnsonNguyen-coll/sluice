@@ -1,10 +1,11 @@
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {createSiweMessage} from 'viem/siwe';
-import {verifyMessage,keccak256,toHex} from 'viem';
+import {verifyMessage,keccak256,toHex,type Address} from 'viem';
 import type {Config} from './config';
 import type {Gateway} from './chain';
 import type {Store} from './store';
 import {apiError,fail} from './errors';
+import {verifyReceipt,receiptHash,computeReputation,type ReputationInput} from '@sluice/sdk';
 import {address,hex,uint,page,body} from './validation';
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,(_,v)=>typeof v==='bigint'?v.toString():v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -14,10 +15,11 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
  async function actor(req:Request){const token=req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];if(!token)fail(401,'UNAUTHORIZED','A wallet session bearer token is required');const value=await store.session(digest(token));if(!value)fail(401,'UNAUTHORIZED','Session expired or invalid');return address(value);}
  async function route(req:Request,url:URL){
   const path=url.pathname.replace(/\/$/,'')||'/';
+  if(path==='/config'&&req.method==='GET')return json({chainId:config.chainId,factories:config.factories,contracts:{agentRegistry:config.agentRegistry,providerRegistry:config.providerRegistry,reputationRegistry:config.reputationRegistry,disputeVault:config.disputeVault}});
   if(path==='/health'&&req.method==='GET'){
    const status=await Promise.allSettled([store.health(),chain.health()]);
    const database=status[0].status==='fulfilled'?'ready':'unavailable',rpc=status[1].status==='fulfilled'?'ready':'unavailable';
-   return json({service:'sluice-backend',status:database==='ready'&&rpc==='ready'?'ready':'degraded',database,rpc,capabilities:{auth:'SIWE bearer sessions',voucherIntake:'V1/V2 authorization queue; no automatic settlement',receipts:'not implemented: Phase 3 checkpoint',reads:'RPC block-window queries; no indexer'}});
+   return json({service:'sluice-backend',status:database==='ready'&&rpc==='ready'?'ready':'degraded',database,rpc,capabilities:{auth:'SIWE bearer sessions',voucherIntake:'V1/V2/V3 authorization queue; settlement is provider-controlled',receipts:'Signed V3 receipt reads; provider persistence migration required',reads:'RPC block-window queries; no indexer'}});
   }
   if(path==='/auth/nonce'&&req.method==='POST'){
    const input=await body(req);const owner=address(input.address);const now=clock();const expires=new Date(now+300000);const nonce=randomBytes(16).toString('hex');
@@ -61,7 +63,21 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    const hash=keccak256(toHex(input.content));await store.addEvidence({id:hash,settlement_id:id.toLowerCase(),author:who.toLowerCase(),content:input.content,created_at:new Date(clock()).toISOString()});
    return json({evidenceHash:hash,stored:true,onChain:false,notice:'Submit this hash through the relevant contract transaction yourself.'},201);
   }
-  if(/^\/receipts\/[^/]+$/.test(path)&&req.method==='GET')fail(501,'RECEIPTS_PENDING','Signed receipt storage and verification await the Phase 3 checkpoint');
+  if(path==='/receipts'&&req.method==='GET'){
+   const who=await actor(req),{limit,offset}=page(url),selected=url.searchParams.get('wallet');let wallet:string|undefined,provider:string|undefined=who;
+   if(selected){wallet=address(selected);const state=await chain.wallet(wallet as Address);if(state.owner.toLowerCase()===who.toLowerCase())provider=undefined;}
+   const records=await store.receipts(wallet,provider,limit,offset),items=[];
+   for(const record of records){if(record.receipt.chainId===config.chainId&&(!wallet||record.receipt.wallet.toLowerCase()===wallet.toLowerCase())&&(!provider||record.receipt.provider.toLowerCase()===provider.toLowerCase())&&await verifyReceipt(record.receipt))items.push({...record,verified:true});}
+   return json({items,limit,offset});
+  }
+  if(/^\/receipts\/[^/]+$/.test(path)&&req.method==='GET'){
+   const who=await actor(req),id=hex(path.split('/')[2],32),record=await store.receipt(id);
+   if(!record)fail(404,'RECEIPT_NOT_FOUND','No stored signed receipt');
+   const wallet=await chain.wallet(record.receipt.wallet);
+   if(![wallet.owner.toLowerCase(),record.receipt.provider.toLowerCase()].includes(who.toLowerCase()))fail(403,'FORBIDDEN','Only the wallet owner or provider may read this receipt');
+   if(record.receipt.chainId!==config.chainId||record.receipt.receipt.voucherHash!==id||!await verifyReceipt(record.receipt))fail(502,'INVALID_STORED_RECEIPT','Stored receipt failed verification');
+   return json({...record,receiptHash:receiptHash(record.receipt),verified:true});
+  }
   fail(404,'NOT_FOUND','Route not found');
  }
  return async function fetchApi(req:Request,ip='local'){

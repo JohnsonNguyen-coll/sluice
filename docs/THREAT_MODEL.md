@@ -135,11 +135,28 @@
 
 ---
 
-## Known Accepted Tradeoffs
+## Phase 3 additions (2026-10-29)
+
+- **Forged wallets / unauthorized metrics:** trusted-factory provenance checks verify the factory's deployment record. Automatic reputation callers are limited to self-wallet settlements; vault outcomes still require an explicit trusted caller. An admin trusting a malicious factory/caller remains a privileged compromise.
+- **Changing dispute terms:** payout and effective arbiter are captured at settlement. Later provider/default-arbiter changes do not rewrite pending cases. A provider-selected arbiter still requires trust; independent arbitration and signed acceptance before settlement are not established by a snapshot.
+- **Deadline front-running:** response/decision are valid strictly before their deadlines; silence/timeout refunds become valid at the exact timestamp. Provider concession can still refund the whole disputed part. Validators' timestamp behavior remains a timing assumption.
+- **Forged/borrowed receipts:** typed provider signatures bind chain, wallet, payment token, voucher hash, request/response hashes, status, nonce, price and time. Sorted Merkle proofs and stored nonce intervals prevent a proved receipt from being reused for another settlement interval. Proportional caps prevent a small receipt from claiming the whole payout. A provider root alone does not prove service quality; absent receipts use a bonded unverified claim path.
+- **Replay and private responses:** modern clients sign an additional request authorization. Middleware verifies it before returning cached results. A publicly settled voucher is insufficient to retrieve cached V3 data. Application authentication must precede payment middleware; payment does not replace application authorization. Legacy wire clients without request signatures cannot retrieve cached responses.
+- **Double release / cross-settlement theft:** undisputedReleased is deducted from every resolution path; state transitions and nonReentrant protect payout/refund/bond transfers. Fuzz/invariant tests cover partial release, all outcomes and isolated liabilities. Fee-on-transfer or rebasing tokens remain unsupported; the factory token allowlist is a trust boundary.
+- **Spam/griefing:** owner-only opening, one dispute per settlement, configurable per-token bond and fixed deadlines bound resource locking. The undisputed remainder can release after the original hold. Bond economics must match provider prices; a zero bond removes the economic spam deterrent. Any positive agent award returns the bond.
+- **Arbiter failure/bias:** timeout refunds the disputed part; the arbiter can divide only that part. An initially biased arbiter is not made independent by technical controls. Default arbiter and admin keys should be secured; testnet keys are not a production governance design.
+- **Wash trading / sybils:** counters are objective protocol observations, not independent-customer attestations. Detectable same-owner feedback has zero fee weight; pair fees are capped. SDK per-wallet profiling excludes directly detected same-owner counterparties. Global historical pair exclusion requires indexing; distinct EOAs and owner-set USD rates do not establish economic independence or market values. Formula confidence and optional verified recency must not be marketed as credit guarantees.
+- **Evidence privacy:** raw bodies/evidence stay off-chain in private storage or local client stores. API evidence is limited to the current wallet owner, provider and settlement-time arbiter; receipt bodies are never returned by receipt APIs. Metadata URIs are not fetched by the backend. Frontend sessions are memory-only and revoked on account/network disconnect; service-role keys never enter public bundles.
+- **Provider/DB outage:** durable atomic acceptance prevents executing a duplicate after a normal retry, but cannot atomically commit arbitrary external application side effects with SQL. Unfinished accepted calls require operator investigation. A confirmed transaction followed by a DB failure needs reconciliation rather than blind rebroadcast. One settlement worker per signer is an operational requirement.
+- **Pause and unsettled exposure:** owner emergency pause can stop settlement. Grace periods/caps bound exposure but do not guarantee payment to a provider holding an off-chain signature. Provider middleware must stop accepting when paused/unhealthy and settle within its risk limits. A compromised hot signer remains limited by on-chain budgets, daily settlement limits, signer validity and pause controls.
+
+No independent security audit is claimed. Current testnet deployments and timed scenario status are recorded separately from local test results.
+
+## Known accepted tradeoffs
 
 | # | Tradeoff | Rationale |
 |---|---|---|
 | 1 | agentSigner key is hot | Required for low-latency signing. Blast radius is bounded by budgets. |
 | 2 | `block.timestamp` used for timelocks | Standard practice. Validators can skew by ~15s on Ethereum, less on Arc. Windows are in hours/days, so manipulation is not practical. |
-| 3 | Provider trusts its off-chain nonce store | A crashed store can cause nonce gaps. The SDK uses atomic increment and per-provider mutexes. |
-| 4 | No on-chain registry of providers | Registry-free by design. Providers are identified by address. |
+| 3 | Durable off-chain authorization state | CAS/SQL channel locks prevent normal races; crash recovery still requires retained history and external-side-effect reconciliation. |
+| 4 | Scores are estimates | Registry counters are verifiable observations; full pair-level indexing and off-chain scoring are needed for broader trust decisions. |

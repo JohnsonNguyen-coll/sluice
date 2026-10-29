@@ -1,4 +1,6 @@
 import deployment from '../../../../contract/deployments/arc-testnet.json';
+const v3=(deployment as unknown as {v3?:{contracts:{AgentWalletFactoryV3?:{address:string}}}}).v3?.contracts.AgentWalletFactoryV3;
+const trustContracts=(deployment as unknown as {v3?:{contracts:Record<string,{address:string}>}}).v3?.contracts||{};
 export const siteConfig = {
  name: 'Sluice', protocol: 'AgentPay', description: 'Payment infrastructure for AI agents on Arc.',
  url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
@@ -6,8 +8,11 @@ export const siteConfig = {
  deployments: [
   { name: 'AgentWalletFactory', version: 'V1', address: deployment.v1.contracts.AgentWalletFactory.address },
   { name: 'AgentWalletFactoryV2', version: 'V2', address: deployment.v2.contracts.AgentWalletFactoryV2.address },
+  ...(v3?[{name:'AgentWalletFactoryV3',version:'V3',address:v3.address}]:[]),
+  ...Object.entries(trustContracts).filter(([name])=>name!=='AgentWalletFactoryV3').map(([name,contract])=>({name,version:'V3',address:contract.address})),
  ],
  usdc: deployment.v1.contracts.AgentWalletFactory.constructorArgs.usdc,
+ recordedFeeBps: deployment.v1.contracts.AgentWalletFactory.constructorArgs.feeBps,
  writeFactory: process.env.NEXT_PUBLIC_FACTORY_ADDRESS || '',
 } as const;
 export const factoryConfigured = /^0x[0-9a-fA-F]{40}$/.test(siteConfig.writeFactory);

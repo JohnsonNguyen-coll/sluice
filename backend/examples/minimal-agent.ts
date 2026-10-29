@@ -1,55 +1,62 @@
-/**
- * Minimal Agent Example
- * =====================
- * An AI agent that pays for API calls using AgentPayClient.
- * The `client.fetch()` call is a drop-in replacement for `fetch` that
- * automatically handles 402 Payment Required responses.
- *
- * Prerequisites:
- *   - Deploy AgentWalletFactory (see contract/script/Deploy.s.sol)
- *   - Set OWNER_PK, AGENT_SIGNER_PK, FACTORY_ADDRESS, USDC_ADDRESS in your env
- */
+import { createPublicClient, type Hex, type Address, isAddress } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { AgentPayClient, detectWallet } from "@sluice/sdk";
+import { FileAgentStore } from "@sluice/sdk/file-store";
+import { resolve } from "node:path";
+import { loadConfig } from "../src/config";
+import { publicRpcTransport } from "../src/rpc";
+import deployment from "../../contract/deployments/arc-testnet.json";
 
-import { AgentPayClient } from '@sluice/sdk';
-
-async function main() {
-  const client = new AgentPayClient({
-    chain:    'arc-testnet',
-    ownerKey: process.env.OWNER_PK!,
-    agentKey: process.env.AGENT_SIGNER_PK!,
-    factory:  process.env.FACTORY_ADDRESS!,
-    usdc:     process.env.USDC_ADDRESS!,
-  });
-
-  // Step 1: Create wallet (one-time per agent)
-  const walletAddress = await client.createWallet({
-    settleWindow: 3600,
-    userSalt:     '0x0000000000000000000000000000000000000000000000000000000000000001',
-  });
-  console.log('Wallet deployed at:', walletAddress);
-
-  // Step 2: Deposit USDC (approval required first)
-  await client.deposit(walletAddress, 100_000_000n); // 100 USDC
-  console.log('Deposited 100 USDC');
-
-  // Step 3: Set budget for the provider
-  const PROVIDER = process.env.PROVIDER_ADDRESS!;
-  await client.setProviderBudget(walletAddress, {
-    provider:   PROVIDER,
-    maxTotal:   50_000_000n,  // 50 USDC max
-    perCallCap: 1_000_000n,   // 1 USDC per call
-  });
-  console.log('Budget set for provider:', PROVIDER);
-
-  // Step 4: Make paid API calls — works just like fetch
-  const response = await client.fetch('http://localhost:3000/answer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ question: 'What is the meaning of life?' }),
-  });
-
-  const data = await response.json();
-  console.log('Got answer:', data);
-}
-
-main().catch(console.error);
+const config = loadConfig(),
+  key = process.env.AGENT_SIGNER_PRIVATE_KEY;
+const wallet = process.env.AGENT_WALLET_ADDRESS,
+  provider = process.env.PROVIDER_ADDRESS;
+if (
+  !key ||
+  !/^0x[0-9a-fA-F]{64}$/.test(key) ||
+  !wallet ||
+  !isAddress(wallet) ||
+  !provider ||
+  !isAddress(provider)
+)
+  throw Error(
+    "Set agent signer, agent wallet and allowed provider in backend/.env",
+  );
+const publicClient = createPublicClient({
+  transport: publicRpcTransport(config.rpcUrls, config.chainId),
+  cacheTime: 0,
+});
+const version = await detectWallet(publicClient, wallet, config.factories);
+const url = process.env.PROVIDER_URL || "http://127.0.0.1:3002/answer";
+const client = new AgentPayClient({
+  wallet,
+  chainId: config.chainId,
+  publicClient,
+  agent: privateKeyToAccount(key as Hex),
+  factories: config.factories,
+  providerRegistry: config.providerRegistry,
+  reputationRegistry: config.reputationRegistry,
+  vault: config.disputeVault,
+  store: new FileAgentStore(
+    resolve(import.meta.dir, "../../.tools/minimal-agent.agentpay-state.json"),
+  ),
+  policy: {
+    allowedProviders: [provider],
+    allowedTokens: [
+      deployment.v1.contracts.AgentWalletFactory.constructorArgs
+        .usdc as Address,
+    ],
+    allowedOrigins: [new URL(url).origin],
+    maxPerCall: 10000n,
+    ...(version === 3
+      ? { requireRegisteredProvider: true, maxDisputeWindow: 86400 }
+      : {}),
+  },
+});
+const response = await client.fetch(url, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ question: "hello" }),
+});
+console.log("API status:", response.status);
+console.log(await response.json());

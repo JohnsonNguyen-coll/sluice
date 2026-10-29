@@ -11,7 +11,7 @@ sequenceDiagram
     participant C as AgentWallet (on-chain)
 
     A->>C: deposit(amount)
-    A->>P: setProviderBudget (off-chain config)
+    A->>C: setProviderBudget (owner transaction)
     A->>P: fetch(url) with Authorization header
     P->>A: 402 Payment Required + requirements
     A->>A: sign EIP-712 Voucher (cumulativeAmount, nonce, expiry)
@@ -32,6 +32,12 @@ sequenceDiagram
 |---|---|
 | `AgentWalletFactory` | CREATE2 deployer. Maps owners to wallets. Governs protocol fee. |
 | `AgentWallet` | Per-agent USDC custodian. Budget enforcement. Voucher settlement. |
+| `AgentWalletFactoryV2` / `AgentWalletV2` | Multi-token allowlist, USD settlement limits and swap adapter. |
+| `AgentWalletFactoryV3` / `AgentWalletV3` | Provenance-verified wallets, receipt commitments, vault routing and reputation hooks. |
+| `AgentRegistry` | ERC-721 identities, metadata hashes/URIs; authoritative V1/V2/V3 factory records. |
+| `ProviderRegistry` | Provider terms, payout address, dispute window and preferred arbiter. |
+| `DisputeVault` | Holds net payouts, snapshots terms, proves receipt claims and resolves disputes. |
+| `ReputationRegistry` | Protocol-authorized raw counters and fee-weighted feedback; scores stay off-chain. |
 
 **AgentWalletFactory** is the protocol singleton deployed once per chain. It snapshots `feeBps` and `feeRecipient` at wallet creation time, so protocol fee changes never affect existing agents.
 

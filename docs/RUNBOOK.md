@@ -1,125 +1,59 @@
-# Sluice AgentPay Core — Operations Runbook
+# Sluice operations runbook
 
-## Incident: Compromised agentSigner Key
+Use the configured release manifest and the wallet's actual version. V1/V2 contracts remain separate non-upgradeable instances. Do not overwrite old addresses or reset signed channel history to repair an operational error.
 
-**Severity:** High — attacker can drain up to `encumberedBalance` per wallet.
+## Compromised agent signer
 
-### Immediate steps (< 5 minutes)
+1. Connect the wallet owner on the correct chain and pause the affected wallet. SDK helpers bind to `client.options.wallet`: use `await client.pause()`; do not pass another wallet address.
+2. Record balances, provider budgets, settled amounts/nonces, outstanding signed vouchers and any vault settlements. Use the provider+token channel for V2/V3.
+3. Rotate with `await client.rotateAgentSigner(newSignerAddress)`. Old signers retain independent grace windows; rotation does not instantly invalidate old signatures.
+4. Keep the wallet paused while assessing old signer validity, voucher expiry and withdrawals/decreases. Do not resume merely because rotation mined. Pause blocks settlement; settlement delay and budget limits do not turn an off-chain authorization into a payment guarantee for providers.
+5. After applicable grace periods, use request/apply budget decreases or withdraw free balance. Pausing/unpausing does not erase withdrawal cooldowns. Never hand the owner key to the active agent runtime.
 
-1. **Pause all affected wallets.**
-   ```bash
-   # Using SDK owner helpers (one wallet):
-   await client.pause(walletAddress);
-   # Or directly via cast (if you have the owner private key):
-   cast send $WALLET_ADDRESS "pause()" --private-key $OWNER_PK --rpc-url $RPC_URL
-   ```
-   This blocks all new settlements immediately.
+## Provider/settler failure
 
-2. **Assess damage.** Query `settled[provider]` for each provider. Subtract expected cumulative amounts. The difference is the attacker's gain.
+- Stop serving new calls when RPC/storage is unavailable, the wallet is paused, a signer is invalid, or exposure exceeds the contract cap/budget. Vouchers are not on-chain reservations.
+- Persist acceptance before application execution and persist receipt/response before acknowledging it. Use the Supabase store in a running provider, not MemoryProviderStore.
+- An identical request with an accepted unfinished voucher returns 425. Investigate the application's business-side effects; do not delete the row and execute again blindly.
+- Run one active settlement worker per provider signer. The channel nonce makes duplicate settlements revert, but that does not avoid duplicate gas costs. Do not run overlapping deployment/e2e scripts against the same account.
+- After a confirmed settlement, mark its receipt commitments with the actual transaction hash/root/proofs. If persistence fails after broadcast, reconcile the on-chain Settled event and root before retrying; do not generate a different root for an already-settled nonce.
+- Stop a watcher/settler using the function returned by `startSettler`/`watchDisputes`. Callbacks should be idempotent. The provider identity must match the signer/wallet client.
 
-3. **Rotate the signer.**
-   ```bash
-   await client.rotateAgentSigner(walletAddress, newSignerAddress);
-   # Old key's vouchers remain valid for settleWindow (1 hour default).
-   # Generate a new keypair from a secure source (HSM recommended).
-   ```
+## Pending or missing agent receipts
 
-4. **Monitor for `Settled` events** during the `settleWindow` — the attacker may submit last-minute vouchers from the old key within that window.
+Retry the identical method/path/query/body and voucher. V3 requires the separate request-authorization signature even for cached responses; an on-chain voucher alone must not expose cached API data. A network error does not prove that execution/payment failed. Use `flagCall` and keep the pending authorization.
 
-5. **Unpause** once settleWindow has elapsed and no suspicious settlements have appeared.
-   ```bash
-   await client.unpause(walletAddress);
-   # Note: withdrawal cooldown lasts settleWindow from pause time.
-   ```
+`client.reconcile(provider, token)` clears pending state only after the chain confirms that nonce/cumulative amount settled. Unsettled expired/cancelled authorizations require explicit owner/provider reconciliation; the SDK deliberately does not reset cumulative spend or silently pay a gap. A stuck FileAgentStore lock must be removed only after confirming no process is using that signer/store. Back up state and never reset it while valid signed vouchers may exist.
 
-6. **Withdraw remaining funds** if the wallet is compromised beyond recovery.
+## Disputes and deadlines
 
-### Recovery checklist
-- [ ] New agentSigner key generated from a secure source
-- [ ] New key stored in KMS / HSM (not in plaintext env var)
-- [ ] SDK configured with new signer
-- [ ] All providers notified of new signer (for off-chain verification caches)
-- [ ] Budgets reviewed — consider reducing maxTotal until audit is complete
-- [ ] Incident report filed
+- Determine settlement token, held amount, original releaseAfter, snapshotted payout/arbiter and undisputedReleased from the vault.
+- Obtain a signed receipt and its commitment/proof via an authenticated owner/provider `/receipts` read. A provider signature and database root are not alone proof of on-chain inclusion; opening a proved dispute verifies both.
+- Approve the configured bond, then open before releaseAfter. A no-receipt claim is explicitly unverified and still requires bond/arbitration.
+- Provider response must mine strictly before responseDeadline. At that timestamp, anyone may call autoRefund if no response exists.
+- After response, only the settlement-time arbiter can decide, strictly before arbiterDeadline. At that timestamp anyone may call arbiterTimeout. Positive agent awards return the bond even if the arbiter requests forfeiture.
+- After the original hold ends, anyone may release the undisputed remainder once. All final resolution paths deduct it; do not count an early release twice in accounting.
+- Refunds return to the wallet in the payout/settlement token, including paused wallets or delisted tokens. Protocol fees stay paid.
+- Private evidence is shared with the current wallet owner, provider and snapshotted arbiter. No raw evidence or personal data is put on-chain; only content hashes.
 
----
+## RPC/Supabase incident
 
-## Incident: Wallet Pause (Routine)
+Arc Testnet public RPCs are attempted in order, Alchemy last when configured. Failures cool down for 30 seconds. All endpoints unavailable means fail closed, not mock chain data. Check chain ID 5042002 before accepting traffic. Never expose private RPC credentials in NEXT_PUBLIC_*.
 
-**When to use:** Unusual spending patterns, suspected compromise, key rotation.
+Apply both SQL migrations in order. `/health` checks private auth and provider-record tables plus RPC. A healthy response confirms connectivity, not completion of a transaction or an independent audit. Service-role keys remain server-side; SIWE sessions are opaque hashed bearer tokens, not Supabase Auth JWTs. Revoke compromised API sessions and rotate the service-role credential through the Supabase project if exposed.
 
-```bash
-# Pause
-cast send $WALLET_ADDRESS "pause()" --private-key $OWNER_PK --rpc-url $RPC_URL
+## Release/redeployment
 
-# Check pauseWithdrawDeadline
-cast call $WALLET_ADDRESS "pauseWithdrawDeadline()(uint256)" --rpc-url $RPC_URL
+`bun run deploy:phase3` is preflight; `--broadcast` submits Arc Testnet transactions using contract/.env. Keep the release JSON, pending journal, runtime hashes, source hashes and configuration transaction hashes. Do not rerun a partial broadcast blindly: inspect the journal and chain before deciding which contracts/configuration calls remain.
 
-# Unpause (does NOT clear withdrawal cooldown)
-cast send $WALLET_ADDRESS "unpause()" --private-key $OWNER_PK --rpc-url $RPC_URL
+The canonical manifest keeps history. Existing wallet balances, budgets, approvals, signatures and identities do not move automatically. Backend configuration must retain the old factories; restart the API after changing manifests or .env (Bun watch does not watch files outside its workspace). ABI changes need versioned old-reader support before changing an existing vault endpoint.
 
-# Withdraw (only after pauseWithdrawDeadline has passed)
-cast send $WALLET_ADDRESS "withdraw(uint256)" $AMOUNT --private-key $OWNER_PK --rpc-url $RPC_URL
+## Resume the real testnet scenarios
+
+Run from contract/:
+
+```sh
+bun --env-file=../backend/.env --env-file=.env run scripts/phase3-testnet-e2e.ts
 ```
 
----
-
-## Incident: Budget Decrease Under Load
-
-If you need to reduce a provider's budget quickly:
-
-1. Call `requestBudgetDecrease(provider, newMaxTotal, newPerCallCap)`.
-2. Wait `settleWindow` seconds (provider has this window to settle outstanding vouchers at the old limit).
-3. Call `executeBudgetDecrease(provider)`.
-
-**Emergency:** If you need to stop a provider immediately, pause the wallet (blocks all settlements). Then rotate the signer to invalidate outstanding vouchers after settleWindow.
-
----
-
-## Incident: Settler Worker Down
-
-**Symptom:** Unsettled vouchers accumulating in the middleware's database. Providers earning exposure without on-chain settlement.
-
-**Action:**
-1. Check settler worker logs for errors (nonce conflicts, RPC errors, gas price issues).
-2. If nonce conflict: reset the nonce in the settler's state store to match the on-chain tx count.
-3. If gas price: increase `maxFeePerGas` in settler config.
-4. Restart settler. It reads all unsettled vouchers from the database on startup.
-
-**Alert threshold:** Configure middleware to alert when unsettled exposure per wallet exceeds a configured limit. Stop serving that wallet if the limit is breached (the middleware's `settle.exposureAlertUsdc` option).
-
----
-
-## Monitoring Checklist
-
-| Metric | Source | Alert threshold |
-|---|---|---|
-| `encumberedBalance` per wallet | Contract events | > 90% of `usdc.balanceOf(wallet)` |
-| Unsettled voucher age | Middleware DB | > 2× settleWindow |
-| Settler tx failure rate | Middleware logs | > 3 consecutive failures |
-| `Settled` events with unexpected provider | Chain indexer | Any unknown provider |
-| `AgentSignerRotated` events | Chain indexer | Unexpected rotation |
-| `Paused` events | Chain indexer | Any pause (pager-duty) |
-
----
-
-## Key Rotation (Routine)
-
-Rotate the agentSigner regularly (monthly or quarterly):
-
-1. Generate a new keypair from a secure source.
-2. Store in KMS / HSM.
-3. Call `rotateAgentSigner(walletAddress, newSigner)`.
-4. Update SDK configuration.
-5. Monitor for `settleWindow` to confirm no issues with the old key.
-
----
-
-## Factory Owner Key Compromise
-
-**Impact:** Attacker can change `feeBps` (for new wallets only) or initiate a `feeRecipient` transfer. Existing wallets and their funds are unaffected.
-
-**Action:**
-1. Initiate a 2-step ownership transfer to a fresh wallet.
-2. Accept with the new owner.
-3. Verify new owner is correct on-chain.
+Completed steps are preserved in deployments/phase3-testnet-e2e.json; keys/state stay in ignored .tools files. The two 3-day cases must wait for their recorded readyAt timestamps. Do not change protocol deadlines or use local time travel to report these real testnet scenarios as passed. Local Anvil results are recorded separately.

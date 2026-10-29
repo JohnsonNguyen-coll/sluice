@@ -11,6 +11,7 @@ import {AgentWalletFactoryV3} from "./AgentWalletFactoryV3.sol";
 import {ProviderRegistry}     from "./ProviderRegistry.sol";
 import {ReputationRegistry}   from "./ReputationRegistry.sol";
 import {DisputeVault}         from "./DisputeVault.sol";
+import {CallReceipts}         from "./CallReceipts.sol";
 
 /// @title AgentWalletV3
 /// @notice Per-agent multi-token wallet with dispute-window routing, call receipts Merkle root,
@@ -66,6 +67,15 @@ contract AgentWalletV3 is ReentrancyGuard {
         uint256 payout;
         address payoutToken;
         uint256 minOut;
+    }
+    struct PayoutRoute {
+        address provider;
+        address tokenIn;
+        address tokenOut;
+        uint256 payout;
+        uint256 minOut;
+        bytes32 settlementId;
+        CallReceipts.Context context;
     }
 
     // ─── Errors ─────────────────────────────────────────────────────────────
@@ -410,10 +420,12 @@ contract AgentWalletV3 is ReentrancyGuard {
         if (!factory.isAllowedToken(v.token)) revert TokenNotAllowed();
 
         // Validate nonce + delta + budget in helper to reduce local stack
+        uint256 firstNonce = nonces[v.provider][v.token] + 1;
         uint256 delta = _validateAndUpdate(v);
 
         // ── Emit + route in sub-function to avoid stack overflow ─────────────
-        _settleEffects(v, delta, minOut, receiptsRoot);
+        CallReceipts.Context memory context = CallReceipts.Context(v.token, firstNonce, v.nonce, delta, receiptsRoot);
+        _settleEffects(v, delta, minOut, context);
     }
 
     /// @dev Validates nonce, delta, budget, daily limit. Applies effects. Returns delta.
@@ -443,15 +455,15 @@ contract AgentWalletV3 is ReentrancyGuard {
         Voucher calldata v,
         uint256 delta,
         uint256 minOut,
-        bytes32 receiptsRoot
+        CallReceipts.Context memory context
     ) internal {
         uint256 fee    = (delta * feeBps) / 10_000;
         uint256 payout = delta - fee;
 
         // Store receipts root
-        if (receiptsRoot != bytes32(0)) {
-            receiptsRoots[v.provider][v.token][v.nonce] = receiptsRoot;
-            emit ReceiptsRootStored(v.provider, v.token, v.nonce, receiptsRoot);
+        if (context.root != bytes32(0)) {
+            receiptsRoots[v.provider][v.token][v.nonce] = context.root;
+            emit ReceiptsRootStored(v.provider, v.token, v.nonce, context.root);
         }
 
         address prefPayoutTk = payoutToken[v.provider];
@@ -462,41 +474,34 @@ contract AgentWalletV3 is ReentrancyGuard {
         if (fee > 0) IERC20(v.token).safeTransfer(feeRecipient, fee);
 
         // Route payout
-        uint256 actualPayout = _routePayout(v.provider, v.token, effectivePk, payout, minOut, settlementId);
+        uint256 actualPayout = _routePayout(PayoutRoute(v.provider, v.token, effectivePk, payout, minOut, settlementId, context));
 
         // Reputation hook (best-effort, non-reverting)
         _recordReputation(address(this), v.provider, v.token, delta);
 
-        emit Settled(v.provider, v.token, delta, fee, v.nonce, v.cumulativeAmount, effectivePk, actualPayout, receiptsRoot, settlementId);
+        emit Settled(v.provider, v.token, delta, fee, v.nonce, v.cumulativeAmount, effectivePk, actualPayout, context.root, settlementId);
     }
 
     // ─── Internal: payout routing ────────────────────────────────────────────
 
-    function _routePayout(
-        address provider,
-        address tokenIn,
-        address tokenOut,
-        uint256 payout,
-        uint256 minOut,
-        bytes32 settlementId
-    ) internal returns (uint256 actualPayout) {
-        // Check if this provider has a dispute window via ProviderRegistry
-        uint32 disputeWindow = _providerDisputeWindow(provider);
+    function _routePayout(PayoutRoute memory route) internal returns (uint256 actualPayout) {
+        // Check if this route.provider has a dispute window via ProviderRegistry
+        uint32 disputeWindow = _providerDisputeWindow(route.provider);
 
-        if (tokenIn != tokenOut) {
+        if (route.tokenIn != route.tokenOut) {
             // Swap then route
             if (swapAdapter == address(0)) revert SwapAdapterNotSet();
-            IERC20(tokenIn).safeIncreaseAllowance(swapAdapter, payout);
+            IERC20(route.tokenIn).safeIncreaseAllowance(swapAdapter, route.payout);
             uint256 swapOut = ISwapAdapter(swapAdapter).swapExactIn(
-                tokenIn, tokenOut, payout, minOut,
-                disputeWindow > 0 ? address(factory.disputeVault()) : _payoutAddressFor(provider),
+                route.tokenIn, route.tokenOut, route.payout, route.minOut,
+                disputeWindow > 0 ? address(factory.disputeVault()) : _payoutAddressFor(route.provider),
                 new bytes(0)
             );
             actualPayout = swapOut;
 
             if (disputeWindow > 0) {
-                DisputeVault(factory.disputeVault()).receiveSettlement(
-                    settlementId, address(this), provider, tokenOut, swapOut, disputeWindow
+                DisputeVault(factory.disputeVault()).receiveSettlementWithReceipts(
+                    route.settlementId, address(this), route.provider, route.tokenOut, swapOut, disputeWindow, route.context
                 );
             }
         } else {
@@ -504,19 +509,19 @@ contract AgentWalletV3 is ReentrancyGuard {
             if (disputeWindow > 0) {
                 // Transfer to vault
                 address vault = factory.disputeVault();
-                IERC20(tokenIn).safeTransfer(vault, payout);
-                DisputeVault(vault).receiveSettlement(
-                    settlementId, address(this), provider, tokenIn, payout, disputeWindow
+                IERC20(route.tokenIn).safeTransfer(vault, route.payout);
+                DisputeVault(vault).receiveSettlementWithReceipts(
+                    route.settlementId, address(this), route.provider, route.tokenIn, route.payout, disputeWindow, route.context
                 );
-                actualPayout = payout;
+                actualPayout = route.payout;
             } else {
-                // Direct to payout address
-                IERC20(tokenIn).safeTransfer(_payoutAddressFor(provider), payout);
-                actualPayout = payout;
+                // Direct to route.payout address
+                IERC20(route.tokenIn).safeTransfer(_payoutAddressFor(route.provider), route.payout);
+                actualPayout = route.payout;
             }
         }
 
-        totalWithdrawn[tokenIn] += payout;
+        totalWithdrawn[route.tokenIn] += route.payout;
     }
 
     // ─── Internal: reputation (best-effort, non-reverting) ───────────────────

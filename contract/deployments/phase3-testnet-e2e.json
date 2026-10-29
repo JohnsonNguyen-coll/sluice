@@ -1,0 +1,66 @@
+{
+  "chainId": 5042002,
+  "releaseFactory": "0x5d89f395e912283d9b8814cf288414544321443c",
+  "owner": "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+  "provider": "0x89023FCd2e9F5a4b76EAfdf6D402EfE31e564Ea9",
+  "agent": "0x4e1f5BEdaaF330ff03170b2ef33E94F8a2feB2D9",
+  "arbiter": "0x5A4E4e22ce38BE2F39FA59936444666867B15f04",
+  "setup": {
+    "provider gas": "0x38974e979c9c65905a38335a791b7d75d64bcb40537a858dedb04eca0a13b553",
+    "arbiter gas": "0xbb219307f05012b5e99b89fdbc10e1c64a7547df6bac544fa250058b3f451e68",
+    "provider registration": "0xfb38900e59127bba81727e549da9679e0d5ec6223557e942f9def882c86bc794",
+    "agent wallet": "0x0603d013f268fa31ed9de9f14be769c9bb1e788c1c7085e4e9d6b37d21d6b8ac",
+    "agent deposit": "0xeecd2c84f9e0e9d0148e3361007e2aaf8716642aa4c06c82dcf34024ef205de3",
+    "agent budget": "0x4c257f929b98ddcd326fd6a648ed166c2a20c8d67ff3b79dea816efe6218863f",
+    "agent identity": "0x9a67dd3e1d4ea5599197570533f1b62c876e95cfaa4090ecd851e3e269e9cd54",
+    "dispute bond approval": "0x58a7b5e50d5bcb62571f61fbf5a54df24a0b9a281f1c2e5ce6701cc2e8bf09f1"
+  },
+  "scenarios": {
+    "clean": {
+      "voucherId": "0xeabf487addeffab5cf0b55197f4f16e71798fbe6485dfc6322262032e03fe5a9",
+      "status": "passed",
+      "settlementId": "0xe15bedda25169d215c6f0b4656b855cd8a98313a712a5cc6089321c02cf7e47a",
+      "settleTx": "0xd5ac67fb0aff686a3f7db0dce3f7edf7d7c1c2f7db5e56b49b195c615997ce90",
+      "readyAt": "1793269988",
+      "resolveTx": "0x41b896431299a3e110f02febf0fc89d3abde67da3506f3cd46121bbe7986634c"
+    },
+    "accept": {
+      "voucherId": "0x115c2afdbec392d84924583e17fda8711b972b8a42b0fb066d73aa4e32af7c2b",
+      "status": "passed",
+      "settlementId": "0x5a617a6e7d4b26817c647ae9b7a8a899b52e1f12fc61a7a54f912c8cd3dbb588",
+      "settleTx": "0xed8286f1fab0868f36963bd87e78441b1bc50b8c038650e48416a4a187b04419",
+      "openTx": "0x5e0f0da6a6fbc57fd0af7ef9ea86b3789a7b3958709c3f85671c3e594c149d1a",
+      "resolveTx": "0xd04b9a914fa3113eec5e1173d00f9778b29b6587d87f84797bd7506ea457d94e"
+    },
+    "silent": {
+      "voucherId": "0xc841a6da1b9de36128ee5d6d0152843e68002522d141411ea436fe6b45f4dbe8",
+      "status": "waiting for on-chain deadline",
+      "settlementId": "0x7a75eb36bb7adf591f5de6a9142b0c86c1862d9e03e08bc1cbd75ecc0789da3a",
+      "settleTx": "0x903e155e08fdae81779689136cbad7e81c682836c830399744c1271302bf7790",
+      "openTx": "0x5312cd01d635434286779fc5f7458940382312cc79d998d633379c23ad803a67",
+      "readyAt": "1793529084",
+      "undisputedReleaseTx": "0x3016877caa32df0f49ba14e6d836da89af8dc15e93753f4da64bdd65b1e40db2"
+    },
+    "split": {
+      "voucherId": "0x113a6e7ef718f40dde444112d9a22285225df321c6b8b5e06307059c27af8864",
+      "status": "passed",
+      "settlementId": "0x78b76e341c69cb44a1e0248b3219c269b2c2c1ddb27559dcf11dfdeda0bcd67f",
+      "settleTx": "0x6e1a6ab6ef75fdfff0b3924754508234e56212d0febe05da6183e3b47e979fa6",
+      "openTx": "0x4c1ba5d16c157ca568131f8534e91fe8e82b0dd57c410835fc73c10a34128d51",
+      "respondTx": "0x74d09dba1df4626c513e39f35f53e8fbbcf516c6dab2082522bd908b631bde6a",
+      "resolveTx": "0x8b6857b6f40cd4bc6cadbf9a3a2ff59f21e1f253288a570af894e1f2d08ca2c5"
+    },
+    "timeout": {
+      "voucherId": "0x5e1547ca15f0b182e993fb3e47e6f22476c1fb54844d789ae6cf70f99635e900",
+      "status": "waiting for on-chain deadline",
+      "settlementId": "0x3fdf0afc41dd90afde730ce0dd5eac812776dee2af6dc3a64c5075570d7c75c6",
+      "settleTx": "0x01a809100c22e4c1f975d8bcd3e7627c8b545c13bfdaa67b94cb5ac7ed94afab",
+      "openTx": "0x8f9e16cf5ffd838ed30a8a1fd9068c44a2457c855c3a3b96c13c451deadea02e",
+      "respondTx": "0xe407d73a23e045a8f4261c105e888ac9b64ebbfadbf5bbfc684f13a1da3fe102",
+      "readyAt": "1793529116",
+      "undisputedReleaseTx": "0xd4fbfdacbe96a74c319ef3226bb9eb56d8c3f94a42b51986769d4b63491b6856"
+    }
+  },
+  "updatedAt": "2026-10-29T11:11:15.327Z",
+  "wallet": "0xB83059016958a074B3F7b65B008ea5446dE24CaD"
+}

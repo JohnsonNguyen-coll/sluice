@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+import {WalletProvenance} from "./WalletProvenance.sol";
 
 /// @title ReputationRegistry
 /// @notice Stores raw, verifiable reputation data for agents and providers.
@@ -74,6 +75,7 @@ contract ReputationRegistry {
     event DisputeOpenedRecorded(address indexed provider, address indexed wallet);
     event FeedbackGiven(address indexed wallet, address indexed provider, uint8 score, bytes32 tagHash);
     event TrustedCallerSet(address indexed caller, bool trusted);
+    event TrustedFactorySet(address indexed factory, bool trusted);
 
     // ─── State ──────────────────────────────────────────────────────────────
 
@@ -82,6 +84,7 @@ contract ReputationRegistry {
 
     /// @notice Trusted callers that may write objective stats (DisputeVault, AgentWalletV3).
     mapping(address => bool) public trustedCaller;
+    mapping(address => bool) public trustedFactory;
 
     /// @notice provider address => objective stats
     mapping(address => ProviderStats) public providerStats;
@@ -124,6 +127,17 @@ contract ReputationRegistry {
         emit TrustedCallerSet(caller, trusted);
     }
 
+    function setTrustedFactory(address factory, bool trusted) external onlyAdmin {
+        if (factory == address(0)) revert ZeroAddress();
+        trustedFactory[factory] = trusted;
+        emit TrustedFactorySet(factory, trusted);
+    }
+
+    function _requireSettlementCaller(address wallet) internal view {
+        if (trustedCaller[msg.sender]) return;
+        if (msg.sender != wallet || !WalletProvenance.verified(msg.sender, trustedFactory)) revert NotTrustedCaller();
+    }
+
     function transferAdmin(address newAdmin) external onlyAdmin { pendingAdmin = newAdmin; }
     function acceptAdmin() external {
         if (msg.sender != pendingAdmin) revert NotAdmin();
@@ -141,7 +155,8 @@ contract ReputationRegistry {
         address wallet,
         address provider,
         uint256 deltaUsdE6
-    ) external onlyTrusted {
+    ) external {
+        _requireSettlementCaller(wallet);
         // Legacy callers do not supply verifiable fees, so they get no score weight.
         _recordSettlement(wallet, provider, deltaUsdE6, 0);
     }
@@ -151,7 +166,8 @@ contract ReputationRegistry {
         address provider,
         uint256 deltaUsdE6,
         uint256 feesUsdE6
-    ) external onlyTrusted {
+    ) external {
+        _requireSettlementCaller(wallet);
         if (feesUsdE6 > deltaUsdE6) revert InvalidFees();
         _recordSettlement(wallet, provider, deltaUsdE6, feesUsdE6);
     }

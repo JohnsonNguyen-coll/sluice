@@ -5,7 +5,8 @@ import {AgentWalletV3TestBase} from "./AgentWalletV3.t.sol";
 import {AgentWalletV3} from "../src/AgentWalletV3.sol";
 import {DisputeVault} from "../src/DisputeVault.sol";
 
-/// @notice Fixed dispute findings are regressions; receipt/onboarding findings remain reproductions.
+/// @notice Fixed findings are regressions. The root-only test documents that membership
+/// is not authentication; signed receipt claims are tested in Phase3Receipts.t.sol.
 contract Phase3ReviewTest is AgentWalletV3TestBase {
     function _held(bytes32 root) internal returns (bytes32 id) {
         _settle(PROVIDER, 100e6, 1, root);
@@ -76,7 +77,11 @@ contract Phase3ReviewTest is AgentWalletV3TestBase {
         vault.releaseUndisputed(id);
     }
 
-    function test_Review_NewFactoryWalletCannotSettleToVaultWithoutAdminOnboarding() public {
+    function test_Fix_NewFactoryWalletSettlesThroughVerifiedFactory() public {
+        vm.startPrank(ADMIN);
+        vault.setTrustedFactory(address(factory), true);
+        repRegistry.setTrustedFactory(address(factory), true);
+        vm.stopPrank();
         wallet = AgentWalletV3(factory.createWallet(OWNER, AGENT_SIGNER, SETTLE_WINDOW, keccak256("fresh")));
         vm.startPrank(OWNER);
         token.approve(address(wallet), 1000e6);
@@ -87,8 +92,9 @@ contract Phase3ReviewTest is AgentWalletV3TestBase {
         bytes memory signature = _sign(voucher, AGENT_SIGNER_PK);
         assertFalse(vault.trustedWallet(address(wallet)));
         assertFalse(repRegistry.trustedCaller(address(wallet)));
+        assertTrue(vault.isTrustedWallet(address(wallet)));
         vm.prank(PROVIDER);
-        vm.expectRevert(DisputeVault.NotTrustedWallet.selector);
         wallet.settle(voucher, signature, 0, bytes32(0));
+        assertEq(repRegistry.getProviderStats(PROVIDER).settledCount, 1);
     }
 }

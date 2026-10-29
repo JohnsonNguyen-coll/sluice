@@ -1,6 +1,7 @@
 import { createPublicClient, getAddress, parseEventLogs, recoverTypedDataAddress, hashTypedData, type Abi, type AbiEvent, type Address, type Hex } from 'viem';
 import {publicRpcTransport} from './rpc';
 import type {Config} from './config';
+import {authorizationData,type SignedVoucher} from '@sluice/sdk';
 import {fail} from './errors';
 import {address,uint,hex,page} from './validation';
 import walletV1 from './abi/AgentWallet.json';
@@ -79,26 +80,27 @@ export class RpcGateway implements Gateway{
  async reputation(at:Address){await this.ready();const registry=this.configured(this.config.reputationRegistry,'REPUTATION_REGISTRY_ADDRESS');const [provider,agent]=await Promise.all([this.read(registry,reputationAbi as Abi,'getProviderStats',[at]),this.read(registry,reputationAbi as Abi,'getAgentStats',[at])]);return {address:at,provider,agent,score:null,scope:'Raw on-chain counters; no invented aggregate score'};}
  async settlements(url:URL,disputes=false){if(!disputes&&url.searchParams.has('wallet')){const wallet=await this.wallet(address(url.searchParams.get('wallet')));return this.logs(wallet.address,walletAbis[wallet.version],url,'Settled');}return this.logs(this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS'),vaultAbi as Abi,url,disputes?'DisputeOpened':'SettlementReceived');}
  async settlement(id:Hex,dispute=false){
-  await this.ready();const at=this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS');const settlement=await this.read(at,vaultAbi as Abi,'getSettlement',[id]) as {wallet:Address;provider:Address};
+  await this.ready();const at=this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS');const settlement=await this.read(at,vaultAbi as Abi,'getSettlement',[id]) as {wallet:Address;provider:Address;arbiter:Address};
   if(settlement.wallet.toLowerCase()===ZERO)fail(404,'SETTLEMENT_NOT_FOUND','Unknown settlement');
   if(!dispute)return {id,settlement};
   const details=await this.read(at,vaultAbi as Abi,'getDispute',[id]) as {openedAt:bigint};
   if(details.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');
   return {id,settlement,dispute:details};
  }
- async authorizeEvidence(id:Hex,actor:Address){const entry=await this.settlement(id,true) as {settlement:{wallet:Address;provider:Address};dispute:{openedAt:bigint}};if(entry.dispute.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');const owner=await this.read(entry.settlement.wallet,walletAbis[3],'owner') as Address;if(![owner.toLowerCase(),entry.settlement.provider.toLowerCase()].includes(actor.toLowerCase()))fail(403,'FORBIDDEN','Only the wallet owner or provider may access dispute evidence');}
+ async authorizeEvidence(id:Hex,actor:Address){const entry=await this.settlement(id,true) as {settlement:{wallet:Address;provider:Address;arbiter:Address};dispute:{openedAt:bigint}};if(entry.dispute.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');const owner=await this.read(entry.settlement.wallet,walletAbis[3],'owner') as Address;if(![owner.toLowerCase(),entry.settlement.provider.toLowerCase(),entry.settlement.arbiter.toLowerCase()].includes(actor.toLowerCase()))fail(403,'FORBIDDEN','Only the wallet owner, provider or snapshotted arbiter may access dispute evidence');}
  async validateVoucher(input:Record<string,unknown>,actor:Address):Promise<ValidVoucher>{
   const at=address(input.wallet,'wallet'),provider=address(input.provider,'provider'),signature=hex(input.signature,65);
   if(provider.toLowerCase()!==actor.toLowerCase())fail(403,'FORBIDDEN','Authenticate as the voucher provider');
-  const state=await this.wallet(at);if(state.version===3)fail(501,'V3_RECEIPTS_PENDING','V3 voucher intake awaits the Phase 3 receipt checkpoint');
+  const state=await this.wallet(at);
   const token=state.version===1?await this.read(at,walletAbis[1],'usdc',[],state.blockNumber) as Address:address(input.token,'token');
   const cumulativeAmount=uint(input.cumulativeAmount),nonce=uint(input.nonce),expiry=uint(input.expiry,64);
   if(state.paused)fail(409,'WALLET_PAUSED','Wallet is paused');
   const block=await this.client.getBlock({blockNumber:state.blockNumber});if(expiry<block.timestamp)fail(409,'VOUCHER_EXPIRED','Voucher has expired');
   const message={wallet:at,provider,...(state.version===1?{}:{token}),cumulativeAmount,nonce,expiry};
   const types={Voucher:[...typesBase,...(state.version===1?[]:[{name:'token',type:'address'}]),{name:'cumulativeAmount',type:'uint256'},{name:'nonce',type:'uint256'},{name:'expiry',type:'uint64'}]};
-  const domain={name:state.version===1?'AgentPay':'AgentPayV2',version:state.version===1?'1':'2',chainId:this.config.chainId,verifyingContract:at};
+  const domain={name:state.version===2?'AgentPayV2':'AgentPay',version:state.version===2?'2':'1',chainId:this.config.chainId,verifyingContract:at};
   let signer:Address;try{signer=await recoverTypedDataAddress({domain,types,primaryType:'Voucher',message,signature});}catch{fail(401,'INVALID_SIGNATURE','Invalid voucher signature');}
+  if(state.version===3){const value:SignedVoucher={wallet:at,provider,token,cumulativeAmount:String(cumulativeAmount),nonce:String(nonce),expiry:String(expiry),version:3,signature,requestHash:hex(input.requestHash,32),requestSignature:hex(input.requestSignature,65)};if((await recoverTypedDataAddress({...authorizationData(value,this.config.chainId),signature:value.requestSignature!})).toLowerCase()!==signer.toLowerCase())fail(401,'INVALID_SIGNATURE','Invalid request authorization');}
   const validUntil=await this.read(at,walletAbis[state.version],'signerValidUntil',[signer],state.blockNumber) as bigint;
   if(validUntil<block.timestamp)fail(401,'INVALID_SIGNATURE','Signer is not authorized');
   const budget=await this.budgets(at,provider,token) as {budget:readonly[bigint,bigint];settled:bigint;nonce:bigint};
@@ -106,7 +108,7 @@ export class RpcGateway implements Gateway{
   if(cumulativeAmount>budget.budget[0])fail(409,'BUDGET_EXCEEDED','Voucher exceeds provider budget');
   const delta=cumulativeAmount-budget.settled;if(budget.budget[1]>0n&&delta>budget.budget[1])fail(409,'PER_CALL_CAP_EXCEEDED','Voucher delta exceeds contract cap');
   // Simulation includes token allowlist, balance, daily limits and authorization.
-  try{await this.client.simulateContract({address:at,abi:walletAbis[state.version],functionName:'settle',account:provider,args:state.version===1?[message,signature]:[message,signature,0n]});}catch{fail(409,'SETTLEMENT_SIMULATION_FAILED','Voucher cannot currently settle without swap parameters');}
+  try{await this.client.simulateContract({address:at,abi:walletAbis[state.version],functionName:'settle',account:provider,args:state.version===1?[message,signature]:state.version===2?[message,signature,0n]:[message,signature,0n,'0x'+'00'.repeat(32)]});}catch{fail(409,'SETTLEMENT_SIMULATION_FAILED','Voucher cannot currently settle without swap parameters');}
   const id=hashTypedData({domain,types,primaryType:'Voucher',message});
   return {id,channel:[this.config.chainId,at,provider,token].join(':').toLowerCase(),chain_id:this.config.chainId,wallet:at.toLowerCase(),provider:provider.toLowerCase(),token:token.toLowerCase(),nonce:nonce.toString(),cumulative_amount:cumulativeAmount.toString(),payload:JSON.parse(JSON.stringify(message,(_,v)=>typeof v==='bigint'?v.toString():v)),signature};
  }

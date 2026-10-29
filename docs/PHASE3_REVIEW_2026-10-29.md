@@ -1,5 +1,7 @@
 # Phase 3 review and coordinated testnet redeployment
 
+Current delivery supersedes the historical review below: see [PHASE3_DELIVERY.md](PHASE3_DELIVERY.md). R4/R5/R7 were subsequently implemented with factory-provenance authorization, individually signed/bounded receipt claims and V1 factory-record fallback, and the coordinated suite was deployed. Roots remain provider commitments; Merkle membership alone is intentionally not receipt authentication. Two real deadline scenarios are still pending their on-chain times.
+
 Reviewed 2026-10-29. This is a source review with executable reproductions and local tests, not a full security audit. No deployment transactions were sent and no production Solidity source was changed.
 
 ## Follow-up: dispute fixes implemented locally

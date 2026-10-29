@@ -1,39 +1,36 @@
-# Phase 3 implementation checkpoint
+# Phase 3 implementation status
 
-Latest follow-up: [2026-10-29 review, dispute fixes and coordinated redeployment plan](PHASE3_REVIEW_2026-10-29.md). Settlement-time payout/arbiter snapshots, exclusive response/arbitration deadlines and one-time undisputed release are implemented locally. Receipt authentication and automatic secure wallet onboarding remain incomplete. V1/V2 redeployment is planned as a coordinated release, not performed.
+Reviewed 2026-10-29. This is an implementation/deployment checkpoint, not an independent security audit. The user authorized completing the work after the earlier stop-and-review checkpoints.
 
-Reviewed 2026-10-28. This records source review and local validation, not a deployment or security audit.
+## Implemented
 
-## Current repository
+- AgentRegistry supports metadata hashes/URIs, two-step identity ownership and authoritative V1/V2/V3 factory provenance. V1 fallback scans a bounded 32-factory set; spoofed/unrecorded wallets remain rejected.
+- ProviderRegistry holds payout/window/arbiter terms. V3 vault snapshots payout/effective arbiter per settlement. Wallets from explicitly trusted V3 factories use the vault and record self-wallet settlements without per-wallet admin grants; dispute counters remain separately privileged.
+- Middleware signs per-call EIP-712 receipts. SDK verifies request/response binding, records flags, enforces provider/token/price/trust policies and preserves pending authorization state. Request authorization is checked before cached responses.
+- V3 settlement commits roots, payment token, gross delta and nonce intervals. Proved disputes verify provider signatures, Merkle inclusion, interval and proportional payout caps; missing-receipt claims remain explicitly unverified and bonded.
+- Response/arbitration deadlines are exclusive, positive agent awards return bonds, and undisputed principal can release once without double payment.
+- Private Supabase stores atomically accept provider channels and persist receipt/response/proof metadata. The Bun API has SIWE sessions, V1/V2/V3 intake, authenticated receipt/evidence reads and current/historical contract configuration.
+- Dashboard reads real API/chain state, creates/funds/configures wallets, registers identities/providers, lists private receipts/settlement availability and exposes dispute/evidence/deadline actions with wallet simulation/confirmation.
+- Source docs, integration examples, threat model, runbook and deployment manifests are updated. SDK/middleware are private local workspaces, not npm publications.
 
-Identity, provider and reputation registries, DisputeVault, V3 wallet/factory and Solidity tests already exist. Their presence does not establish that Phase 3 is complete. The Next.js frontend lives in `frontend/`; the `packages/sdk` and `packages/middleware` directories described in the roadmap are absent. Examples importing those packages are integration sketches, not evidence of a working SDK.
+## Verification
 
-## Checkpoint 1: registry hardening
+- Solidity unit/fuzz: **274 passed**, zero failures, including new provenance/receipt/V1 compatibility regressions.
+- Invariant selection: **17 passed**, zero failures, using 128 runs × 256 handler calls and fail-on-revert. This is 16 invariant properties plus one matching ordinary unit test; it is not the 256×500 configuration.
+- Runtime-size build passes. V3 factory 20,064 bytes, vault 14,098, AgentRegistry 10,407, ReputationRegistry 6,300, all below 24,576 bytes.
+- Local Anvil end-to-end includes 9 paid calls, multi-leaf receipts/proofs, cache replay protection, missing request-signature rejection, V1/V2 compatibility, every dispute outcome and a real Express raw-body adapter. Local time travel is not testnet completion.
+- TypeScript/backend/SDK/middleware checks, production frontend build and 54-route smoke checks pass; final delivery details/logs are in PHASE3_DELIVERY.md.
 
-- Factory deployment-record verification prevents forged wallets from registering.
-- Registration is protected against receiver-callback reentrancy; standard NFT transfers synchronize identity owner and clear previous nominations.
-- Agent content-hash registration/updates and registry administration events are available.
-- Feedback supports the payment wallet's current owner, uses actual fees separately from volume and excludes detectable same-owner pairs from score weight.
-- Disputes are counted when opened; outcomes no longer inflate opened counters. Auto-refunds are available on agent stats.
-- V3 settlement and vault opening hooks pass the new data; V1/V2 source contracts are unchanged.
-- ERC-8004 primary sources and compatibility limits are documented in DECISIONS.md D21–D23.
+## Real Arc Testnet release
 
-## Remaining work after this checkpoint
+Fresh V1/V2/V3 factories, AgentRegistry, ProviderRegistry, ReputationRegistry and DisputeVault were deployed. Runtime bytecode was compared with build artifacts with immutable slots normalized. Source/runtime hashes, constructor arguments, configuration transactions and old deployment history are in `contract/deployments/arc-testnet.json` and the dated release file. This is not explorer source verification or an external audit.
 
-1. Implement real SDK/middleware packages and signed receipts, receipt storage, Merkle trees and verification against the V3 contract. A stored root alone does not prove a complete receipt flow.
-2. Review DisputeVault/V3 against the full spec, especially receipt-proof/no-receipt claims, payout/arbiter snapshots, undisputed fund release, deadline boundaries, bond accounting, delisted tokens and paused wallets. Existing V3 code must not be treated as completed merely because current tests pass.
-3. Add the SDK policy/profile/dispute APIs, provider callbacks, dashboard profiles and dispute center. Keep V1/V2 behavior supported.
-4. Deploy fresh V3/registry contracts only after these checks, then record the requested six testnet scenarios with transaction hashes. `contract/deployments/arc-testnet.json` contains only V1/V2, but `contract/metadata/*.json` records earlier V3/registry deployments and transaction hashes. Those records have not been independently verified here and predate these source changes; non-upgradeable deployed instances do not receive these fixes.
-5. Complete architecture diagrams, threat model, integration guide, defaults and runbook for the final behavior.
+The real flow registered an agent/provider, created/funded a V3 wallet, served 5 paid calls with verified receipts persisted in Supabase, settled them, released a clean payment, accepted/refunded a dispute and completed an arbiter split. API smoke checks confirmed SIWE, authenticated receipt access, stored proofs, V3 reads and anonymous receipt denial.
 
-The supplied work order says to stop and show results after registries/tests. This checkpoint follows that boundary; no claim is made that receipts, disputes, UI or testnet e2e are complete.
+Two scenarios are correctly pending real chain time: silent-provider refund at 2026-11-01 10:31:24 UTC and arbiter timeout at 2026-11-01 10:31:56 UTC. All opening/response/settlement hashes and readyAt timestamps are in `contract/deployments/phase3-testnet-e2e.json`. Resume the script after those times; no automatic future run has been scheduled.
 
-## Local validation
+## Operational limits
 
-- Solidity 0.8.28, pinned OpenZeppelin 5.6.1, offline Foundry execution after dependency setup.
-- `forge test --offline --threads 2 --no-match-test 'invariant_' --summary`: **248 passed, 0 failed**, including 90 registry tests and unit/fuzz regressions for V1/V2/V3/vault. Fuzz tests use 256 runs.
-- `FOUNDRY_INVARIANT_RUNS=64 FOUNDRY_INVARIANT_DEPTH=128 forge test --offline --threads 2 --match-test 'invariant_' --summary`: **14 passed, 0 failed** (13 invariant properties plus one unit test whose name contains `invariant_`). Each invariant ran 8,192 handler calls. The long 256×500 run was interrupted; it is not claimed as completed validation.
-- The vault invariant handler previously consumed its prank on `balanceOf`, making every attempted settlement revert. The corrected handler now exercises settlement and release with zero reverts in the recorded run (4,083 settlements and 4,109 release-handler calls).
-- `forge build --offline --sizes`: passed. Runtime sizes: AgentRegistry 9,554 bytes, ReputationRegistry 5,551, V3 wallet 15,571, V3 factory 19,580, vault 9,848; all below the 24,576-byte runtime limit. Existing compiler/linter warnings remain.
+Provider clients must retain signed channel state and run one settlement worker per signer. Storage cannot atomically commit arbitrary external application side effects. Unfinished requests and confirmed-tx/DB failures require reconciliation. There is no persistent global event indexer; public activity uses bounded windows and private receipt lists are paginated. Global historical collusion/self-dealing filtering needs verified indexing. Provider-selected arbiters remain a trust assumption. Full production hardening, independent audit, explorer verification and npm publication are not claimed.
 
-Local logs: `.tools/phase3-unit-tests.log`, `.tools/phase3-invariant-tests.log`, `.tools/phase3-sizes.log`. The earlier interrupted `.tools/phase3-tests.log` is not the final result. No testnet transactions were submitted for these changes.
+The historical pre-fix review remains at PHASE3_REVIEW_2026-10-29.md. Its R4/R5/R7 gaps were subsequently implemented in this release; use this status/delivery record for current behavior.

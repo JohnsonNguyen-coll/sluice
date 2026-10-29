@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -62,6 +63,9 @@ contract AgentRegistry is ERC721URIStorage, ReentrancyGuard {
 
     /// @notice Trusted factory addresses whose wallets may be registered.
     mapping(address => bool) public trustedFactory;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    EnumerableSet.AddressSet private _factories;
+    error TooManyFactories();
 
     /// @notice agentId => AgentEntry
     mapping(uint256 => AgentEntry) public agents;
@@ -84,6 +88,8 @@ contract AgentRegistry is ERC721URIStorage, ReentrancyGuard {
         admin = msg.sender;
         for (uint256 i; i < initialFactories.length; ++i) {
             if (initialFactories[i] == address(0)) revert ZeroAddress();
+            if (_factories.length() >= 32 && !_factories.contains(initialFactories[i])) revert TooManyFactories();
+            _factories.add(initialFactories[i]);
             trustedFactory[initialFactories[i]] = true;
             emit TrustedFactorySet(initialFactories[i], true);
         }
@@ -99,6 +105,10 @@ contract AgentRegistry is ERC721URIStorage, ReentrancyGuard {
     /// @notice Add or remove a trusted factory.
     function setTrustedFactory(address factory, bool trusted) external onlyAdmin {
         if (factory == address(0)) revert ZeroAddress();
+        if (trusted) {
+            if (_factories.length() >= 32 && !_factories.contains(factory)) revert TooManyFactories();
+            _factories.add(factory);
+        } else _factories.remove(factory);
         trustedFactory[factory] = trusted;
         emit TrustedFactorySet(factory, trusted);
     }
@@ -266,7 +276,13 @@ contract AgentRegistry is ERC721URIStorage, ReentrancyGuard {
             );
             return verified && result.length == 32 && abi.decode(result, (uint256)) == 1;
         }
-        // Legacy wallets without factory() remain usable but cannot register here.
+        // V1 has no factory getter: verify against the bounded authoritative factory list.
+        for (uint256 i; i < _factories.length(); ++i) {
+            (bool verified, bytes memory result) = _factories.at(i).staticcall(
+                abi.encodeWithSignature("isFactoryWallet(address)", wallet)
+            );
+            if (verified && result.length == 32 && abi.decode(result, (uint256)) == 1) return true;
+        }
         return false;
     }
 

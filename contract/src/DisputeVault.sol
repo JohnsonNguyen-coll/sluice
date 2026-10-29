@@ -6,6 +6,11 @@ import {SafeERC20}        from "@openzeppelin/contracts/token/ERC20/utils/SafeER
 import {IERC20}           from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ProviderRegistry} from "./ProviderRegistry.sol";
 import {ReputationRegistry} from "./ReputationRegistry.sol";
+import {WalletProvenance} from "./WalletProvenance.sol";
+import {CallReceipts} from "./CallReceipts.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title DisputeVault
 /// @notice Holds settled provider payouts during the dispute window.
@@ -96,6 +101,7 @@ contract DisputeVault is ReentrancyGuard {
     error ProviderNotResponded();
     error ArbiterDeadlineExpired();
     error NoUndisputedFunds();
+    error InvalidReceipt();
     error ArbiterDeadlineNotExpired();
     error SplitExceedsDisputed();
     error AlreadyResolved();
@@ -120,6 +126,8 @@ contract DisputeVault is ReentrancyGuard {
     event DefaultArbiterChanged(address indexed oldArbiter, address indexed newArbiter);
     event DisputeBondSet(address indexed token, uint256 bond);
     event TrustedWalletSet(address indexed wallet, bool trusted);
+    event TrustedFactorySet(address indexed factory, bool trusted);
+    event ReceiptClaimed(bytes32 indexed settlementId, bytes32 receiptHash, bool verified);
 
     // ─── State ──────────────────────────────────────────────────────────────
 
@@ -133,12 +141,14 @@ contract DisputeVault is ReentrancyGuard {
 
     /// @notice Trusted wallets (AgentWalletV3 instances verified by factory)
     mapping(address => bool) public trustedWallet;
+    mapping(address => bool) public trustedFactory;
 
     /// @notice settlementId => Settlement
     mapping(bytes32 => Settlement) public settlements;
 
     /// @notice settlementId => Dispute
     mapping(bytes32 => Dispute) public disputes;
+    mapping(bytes32 => CallReceipts.Context) public receiptContexts;
 
     /// @notice Configurable dispute bond per token (set by admin)
     mapping(address => uint256) public disputeBond;
@@ -195,6 +205,16 @@ contract DisputeVault is ReentrancyGuard {
         emit TrustedWalletSet(wallet, trusted);
     }
 
+    function setTrustedFactory(address factory, bool trusted) external onlyAdmin {
+        if (factory == address(0)) revert ZeroAddress();
+        trustedFactory[factory] = trusted;
+        emit TrustedFactorySet(factory, trusted);
+    }
+
+    function isTrustedWallet(address wallet) public view returns (bool) {
+        return trustedWallet[wallet] || WalletProvenance.verified(wallet, trustedFactory);
+    }
+
     // ─── Core: receive settlement ────────────────────────────────────────────
 
     /// @notice Called by AgentWalletV3 when settling with a provider that has disputeWindow > 0.
@@ -213,7 +233,22 @@ contract DisputeVault is ReentrancyGuard {
         uint256 amount_,
         uint32  window_
     ) external {
-        if (!trustedWallet[msg.sender]) revert NotTrustedWallet();
+        _receiveSettlement(settlementId, wallet_, provider_, token_, amount_, window_);
+    }
+
+    function receiveSettlementWithReceipts(
+        bytes32 settlementId, address wallet_, address provider_, address token_,
+        uint256 amount_, uint32 window_, CallReceipts.Context calldata context
+    ) external {
+        if (context.grossAmount == 0 || context.firstNonce == 0 || context.lastNonce < context.firstNonce || context.paymentToken == address(0)) revert InvalidReceipt();
+        _receiveSettlement(settlementId, wallet_, provider_, token_, amount_, window_);
+        receiptContexts[settlementId] = context;
+    }
+
+    function _receiveSettlement(
+        bytes32 settlementId, address wallet_, address provider_, address token_, uint256 amount_, uint32 window_
+    ) internal {
+        if (msg.sender != wallet_ || !isTrustedWallet(msg.sender)) revert NotTrustedWallet();
         if (settlements[settlementId].heldAt != 0) revert DisputeAlreadyOpen(); // re-use error; means duplicate id
 
         settlements[settlementId] = Settlement({
@@ -274,6 +309,29 @@ contract DisputeVault is ReentrancyGuard {
         uint8   reasonCode,
         bytes32 evidenceHash
     ) external nonReentrant {
+        _openDispute(settlementId, disputeAmount, reasonCode, evidenceHash);
+        emit ReceiptClaimed(settlementId, bytes32(0), false);
+    }
+
+    /// @notice A proved receipt is provider-signed and bound to this settlement's nonce interval.
+    function openDisputeWithReceipt(
+        bytes32 settlementId, CallReceipts.Receipt calldata receipt, bytes calldata signature,
+        bytes32[] calldata proof, uint256 disputeAmount, uint8 reasonCode, bytes32 evidenceHash
+    ) external nonReentrant {
+        Settlement storage s = settlements[settlementId];
+        CallReceipts.Context storage context = receiptContexts[settlementId];
+        bytes32 digest = CallReceipts.digest(receipt, s.wallet);
+        if (context.root == bytes32(0) || receipt.token != context.paymentToken ||
+            receipt.nonce < context.firstNonce || receipt.nonce > context.lastNonce ||
+            receipt.amount == 0 || receipt.amount > context.grossAmount || receipt.timestamp > s.heldAt + 300 ||
+            !SignatureChecker.isValidSignatureNow(s.provider, digest, signature) ||
+            !MerkleProof.verifyCalldata(proof, context.root, CallReceipts.leaf(receipt, s.wallet))) revert InvalidReceipt();
+        if (disputeAmount > Math.mulDiv(receipt.amount, s.amount, context.grossAmount)) revert DisputeAmountTooLarge();
+        _openDispute(settlementId, disputeAmount, reasonCode, evidenceHash);
+        emit ReceiptClaimed(settlementId, digest, true);
+    }
+
+    function _openDispute(bytes32 settlementId, uint256 disputeAmount, uint8 reasonCode, bytes32 evidenceHash) internal {
         Settlement storage s = settlements[settlementId];
         if (s.heldAt == 0) revert SettlementNotFound();
         if (s.state != SettlementState.HELD) revert NotInHeldState();
@@ -440,7 +498,7 @@ contract DisputeVault is ReentrancyGuard {
 
         // Bond handling
         if (d.bond > 0) {
-            if (returnBondToAgent) {
+            if (returnBondToAgent || refundToWallet > 0) {
                 IERC20(s.token).safeTransfer(d.openedBy, d.bond);
             } else {
                 // Bond forfeited to admin (protocol treasury)
@@ -472,7 +530,7 @@ contract DisputeVault is ReentrancyGuard {
         }
         reputationRegistry.recordDisputeOutcome(s.wallet, s.provider, outcome);
 
-        emit ArbiterDecided(settlementId, refundToWallet, toProvider, returnBondToAgent);
+        emit ArbiterDecided(settlementId, refundToWallet, toProvider, returnBondToAgent || refundToWallet > 0);
     }
 
     // ─── Arbiter timeout (safe default) ─────────────────────────────────────

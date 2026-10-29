@@ -6,7 +6,8 @@
   "workspaces": [
     "frontend",
     "backend",
-    "contract"
+    "contract",
+    "backend/packages/*"
   ],
   "scripts": {
     "dev": "bun run --cwd frontend dev",
@@ -23,7 +24,10 @@
     "fetch:abi": "bun run --cwd frontend fetch:abi",
     "backend:dev": "bun run --cwd backend dev",
     "backend:start": "bun run --cwd backend start",
-    "backend:check": "bun run --cwd backend check"
+    "backend:check": "bun run --cwd backend check",
+    "protocol:check": "bun run --cwd backend/packages/sdk check && bun run --cwd backend/packages/middleware check",
+    "deploy:phase3": "bun run --cwd contract deploy:phase3",
+    "test:e2e:local": "bun run contract/scripts/phase3-local-e2e.ts"
   },
   "overrides": {
     "viem": "2.57.5"

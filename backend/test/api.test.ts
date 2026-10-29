@@ -23,6 +23,8 @@ class TestStore implements Store{
  async vouchers(provider:string,limit:number,offset:number){return (await db.query('select * from api_vouchers where provider=$1 order by received_at desc,id desc limit $2 offset $3',[provider,limit,offset])).rows;}
  async addEvidence(r:EvidenceRecord){await db.query('insert into api_evidence(id,settlement_id,author,content) values($1,$2,$3,$4) on conflict do nothing',[r.id,r.settlement_id,r.author,r.content]);}
  async evidence(id:string){return (await db.query('select * from api_evidence where settlement_id=$1',[id])).rows;}
+ async receipt(_id:string){return null;}
+ async receipts(){return [];}
 }
 const config=loadConfig({AUTH_ORIGIN:'http://127.0.0.1:3010'});
 class TestChain extends RpcGateway{
@@ -93,7 +95,7 @@ test('bad input, CORS, payload limits, auth throttling and pending receipts',asy
  expect((await request('/health','GET',undefined,undefined,'https://evil.example')).status).toBe(403);
  expect((await request('/auth/nonce','POST',{address:account.address},undefined,config.authOrigin,'cors')).headers.get('access-control-allow-origin')).toBe(config.authOrigin);
  expect((await request('/auth/nonce','POST',{address:account.address,padding:'x'.repeat(33000)},undefined,undefined,'large')).status).toBe(413);
- expect((await request('/receipts/anything')).status).toBe(501);
+ expect((await request('/receipts/anything')).status).toBe(401);
  for(let i=0;i<20;i++)await request('/auth/me','GET',undefined,undefined,undefined,'throttle');
  expect((await request('/auth/me','GET',undefined,undefined,undefined,'throttle')).status).toBe(429);
  expect((await request('/unknown')).status).toBe(404);
@@ -103,5 +105,5 @@ test('unconfigured Supabase fails closed; service key only sent to configured RE
  let seenUrl='',seenHeaders=new Headers();
  const transport=(async(url:RequestInfo|URL,init?:RequestInit)=>{seenUrl=String(url);seenHeaders=new Headers(init?.headers);return new Response('[]');}) as typeof fetch;
  await new SupabaseStore({supabaseUrl:'https://project.supabase.co',supabaseKey:'server-secret'},transport).health();
- expect(seenUrl).toBe('https://project.supabase.co/rest/v1/api_challenges?select=id&limit=0');expect(seenHeaders.get('authorization')).toBe('Bearer server-secret');
+ expect(seenUrl).toBe('https://project.supabase.co/rest/v1/api_provider_records?select=id&limit=0');expect(seenHeaders.get('authorization')).toBe('Bearer server-secret');
 });

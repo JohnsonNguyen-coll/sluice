@@ -2,7 +2,7 @@
 
 Bun HTTP server + Supabase PostgreSQL (PostgREST), with read-only viem RPC access.
 No SQLite, private signing key, automatic on-chain transaction or fake chain data.
-This is an initial API implementation, not completion of the Phase 3 receipt/dispute work order.
+Phase 3 SDK/middleware are in packages/sdk and packages/middleware. The private API serves receipts persisted by the provider's Supabase store; transactions are signed by the owner/provider clients, never by the API server.
 
 ## Run locally
 
@@ -21,12 +21,12 @@ Use `bun run backend:start` without watch mode for a process manager.
 ## Set up Supabase
 
 1. Use an existing or new Supabase project.
-2. Apply [the migration](supabase/migrations/202610290001_backend.sql) through the Supabase SQL editor or your normal migration pipeline.
+2. Apply [the authentication/API migration](supabase/migrations/202610290001_backend.sql), then [provider receipts](supabase/migrations/202610290002_provider_receipts.sql) through the Supabase SQL editor or your normal migration pipeline.
 3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env. Use the server-only legacy service_role JWT key for the PostgREST authorization headers.
 4. Arc Testnet public RPC failover works by default. Set AUTH_ORIGIN to the exact frontend origin (localhost and 127.0.0.1 are different).
 5. Set optional registry/vault addresses only after verifying their deployments match the current contracts. Historical metadata is not selected automatically.
 
-No Supabase credentials were available during implementation, so no remote project/schema was changed or live database connectivity verified. The migration was executed against embedded PostgreSQL in tests, including denied anon/authenticated access.
+Both migrations run against embedded PostgreSQL in tests, including denied anon/authenticated access. The configured project was also used for real testnet receipt persistence and authenticated receipt reads. Schema changes were applied by the user; service-role credentials are never included in responses or source files.
 
 Every table has RLS enabled. All privileges and RPC execution are revoked from public, anon and authenticated. Only the backend service_role may use this storage. Browser clients call this API with a wallet session bearer token; those sessions are not Supabase Auth JWTs. Do not send the service-role key to a browser.
 
@@ -46,7 +46,7 @@ Every table has RLS enabled. All privileges and RPC execution are revoked from p
 | GET | /agents/:id | Public, integer id | Registry entry, URI and metadata hash; no arbitrary URL fetching |
 | GET | /providers/:address | Public | Provider registry entry |
 | GET | /reputation/:address | Public | Raw provider/agent counters; aggregate score is null |
-| POST | /vouchers | Bearer of provider, signed voucher JSON | Validate V1/V2 domain, signer, chain state, budget and settlement simulation; persist authorization atomically |
+| POST | /vouchers | Bearer of provider, signed voucher JSON | Validate V1/V2/V3 domain, signer, chain state, budget and settlement simulation; V3 also requires request authorization |
 | GET | /vouchers | Bearer | Only this provider's stored vouchers |
 | GET | /settlements | wallet for V1/V2/V3 wallet Settled logs, otherwise configured vault | Block-window event results |
 | GET | /settlements/:id | Public; vault settlement bytes32 id | Current vault settlement |
@@ -54,9 +54,11 @@ Every table has RLS enabled. All privileges and RPC execution are revoked from p
 | GET | /disputes/:id | Public; vault settlement bytes32 id | Settlement and dispute state |
 | POST | /disputes/:id/evidence | Bearer of current wallet owner or provider; JSON content | Store UTF-8 evidence and return keccak256 hash; no transaction |
 | GET | /disputes/:id/evidence | Same party access | Stored evidence, up to 100 entries |
-| GET | /receipts/:id | Reserved | HTTP 501 until Phase 3 receipt implementation/checkpoint |
+| GET | /config | Public | Chain, current/historical factories and active registry/vault addresses; no RPC URLs or credentials |
+| GET | /receipts | Bearer; optional wallet, limit, offset | Own provider receipts, or all receipts for a wallet currently owned by this session |
+| GET | /receipts/:id | Bearer of wallet owner or provider | Verify provider signature and return signed receipt and stored settlement commitment/proof; no cached API body |
 
-Amounts, nonces, block numbers and contract uint values are decimal strings in JSON. A signature or id is 0x-prefixed hex. Bodies are limited to 32 KiB; evidence content to 16 KiB. Metadata hashes and URIs are returned as recorded, not fetched or endorsed.
+Amounts, nonces, block numbers and contract uint values are decimal strings in JSON. A signature or id is 0x-prefixed hex. Bodies are limited to 32 KiB; evidence content to 16 KiB. Metadata hashes and URIs are returned as recorded, not fetched or endorsed. Evidence is shared only with the current wallet owner, provider and settlement-time arbiter. Receipt `verified` means the provider signature/domain passed verification; stored commitment metadata is checked by the contract when opening a proved claim and is not an independent audit of API quality.
 
 ### Authentication example
 
@@ -114,9 +116,9 @@ To minimize paid RPC usage, leave RPC_URLS and RPC_URL empty and set ALCHEMY_RPC
 
 Use real addresses, a future expiry and a 65-byte EIP-712 signature. V1 infers its USDC token and signs AgentPay / version 1 with no token in the message. V2 signs AgentPayV2 / version 2 with token included. The API authenticates the provider, not the signing agent. A rotated signer may remain valid within its on-chain grace period.
 
-The API rejects paused wallets and cumulative deltas above the on-chain per-call cap, and simulates settlement with minOut=0. Swap-sensitive providers must handle their own slippage and settlement transaction. Saved vouchers are not reservations, guaranteed payments, receipts or executed settlements. Revalidate before submitting a transaction. No background settler is included.
+The API rejects paused wallets and cumulative deltas above the on-chain per-call cap, and simulates settlement with minOut=0. Swap-sensitive providers must handle their own slippage and settlement transaction. Saved vouchers are not reservations, guaranteed payments, receipts or executed settlements. Revalidate before submitting a transaction. The API has no custody/settler; provider middleware exposes its own explicit settlement worker.
 
-V3 intake returns 501 because receipt-root/dispute semantics are still behind the Phase 3 checkpoint. V3/registry/vault reads require explicit configuration; no V3 deployment is assumed current.
+V3 uses AgentPay/version 1 with token-bearing voucher fields and a separate AgentPayCall/version 1 request signature. Include requestHash and requestSignature for V3 intake. Defaults use the canonical verified testnet release; custom factory configurations do not implicitly trust unrelated registries.
 
 ### Event windows and errors
 
@@ -136,4 +138,4 @@ bun run backend/scripts/generate-abis.ts
 
 Tests use real PostgreSQL semantics through PGlite for migrations, grants, nonce consumption and voucher-channel transactions, plus deterministic mock RPC responses for contract reads and V1/V2 EIP-712 validation. No real chain transactions are sent.
 
-The files in examples/ remain historical SDK/middleware sketches; @sluice/sdk and @sluice/middleware still do not exist and are not included in the backend build.
+The private workspace packages @sluice/sdk and @sluice/middleware are included in bun install and checked by bun run protocol:check. Examples run from this repository; they are not published npm packages. Local and real-testnet end-to-end scripts/transaction reports are separate from deterministic unit tests.

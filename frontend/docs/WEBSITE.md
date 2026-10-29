@@ -1,10 +1,12 @@
-# Website foundations
+# Website and live workspace
 
 ## Scope and checkpoint
 
-This is **step 1** of the requested website redesign, reviewed 2026-10-28. It provides Next.js App Router routing, metadata, shared layouts, theme, design tokens, base components and designed states. It does not claim completion of the full landing page, MDX documentation, on-chain readers, dashboard transactions, SEO assets or performance/a11y certification.
+Updated 2026-10-29. The Next.js application retains the landing, routes, theme, Dark Veil motion and design system. App routes now connect to the Bun API and injected-wallet clients for real reads and simulated/confirmed transactions. Production/a11y certification and an independent contract audit are not claimed.
 
-Contract sources, SDK/middleware logic and deployment records are unchanged. The prior dashboard is available through “Open existing dashboard” on /app. Its injected-wallet connection and protocol-information capabilities are preserved using the new wallet control. Previously unavailable actions remain unavailable.
+The coordinated V1/V2/V3 release is in the canonical manifest, including historical factories. Dashboard features include wallet creation/funding/budgets, identity/provider registration, receipt lists, held/releasable batch views, private evidence and dispute/deadline actions. SIWE tokens stay in memory and are revoked on account/network disconnect. Service-role/signing keys stay server-side. Organization/approval/subscription capabilities remain planned. The prior dashboard stays available through “Open existing dashboard” on /app.
+
+See ../../docs/PHASE3_DELIVERY.md for tests, real transaction hashes and the two pending three-day testnet deadlines. Public reference pages explain actual behavior; they use React content rather than an MDX search pipeline. The historical design notes below describe the earlier foundation checkpoint.
 
 The public branding retains Sluice; AgentPay is identified as a working protocol name.
 

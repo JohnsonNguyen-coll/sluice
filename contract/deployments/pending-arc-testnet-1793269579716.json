@@ -1,0 +1,115 @@
+{
+  "chainId": 5042002,
+  "deployedAt": "2026-10-29T10:26:20.029Z",
+  "feeBps": 30,
+  "feeRecipient": "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "contracts": {
+    "AgentWalletFactory": {
+      "address": "0x3662ab96c961915df01e141b62a2b785d0495790",
+      "txHash": "0x3ee2c8ef63e8db9eb2cbb370d9012c101b44792b3a8d63dd10b80e5da98b15db",
+      "blockNumber": "69655228",
+      "constructorArgs": [
+        "0x3600000000000000000000000000000000000000",
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        30
+      ],
+      "runtimeHash": "0x954ad4961dd5b8f445b402286726a130396f0e1e7b02d151dfad585909f65d04"
+    },
+    "AgentWalletFactoryV2": {
+      "address": "0xf3432dba7143e9c027a2b9496b78fff9989c6448",
+      "txHash": "0x61b530289a3aa98e9ae089ca952f00599bc997614f24971605e508a7101cdfa2",
+      "blockNumber": "69655238",
+      "constructorArgs": [
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        30,
+        [
+          "0x3600000000000000000000000000000000000000"
+        ]
+      ],
+      "runtimeHash": "0x8b33704d3cf08e872e79dee725bbd789d66fa48eb3b966877f28ca0ab77d0ef2"
+    },
+    "ProviderRegistry": {
+      "address": "0x52568fe53bc59c2aac6295ec351f928d8abbce92",
+      "txHash": "0x9601f64c197927c68808be724c0b9d713c224678bd87014e936d53d89fef5ad9",
+      "blockNumber": "69655249",
+      "constructorArgs": [],
+      "runtimeHash": "0x4e2f1023177dded8c40f1eb0f7ff35a1b1faee1c13719008e92d9ea17a889431"
+    },
+    "ReputationRegistry": {
+      "address": "0x88b9d58a32b279b959bbb1f7143a7f18aaf2da58",
+      "txHash": "0x9a11e557b37bf309a1fcd60ab6b121ab60f3632f24cf594cb2030bc01f747227",
+      "blockNumber": "69655259",
+      "constructorArgs": [],
+      "runtimeHash": "0x8d492639d0d0a59004904b1edc15360fec64b9d0dbd7cb3e59c8aa0d9e21fa5f"
+    },
+    "DisputeVault": {
+      "address": "0x3699e8425a44f03bfd63bd754795ea10a1349b1e",
+      "txHash": "0x298a27e54dd75f39b8453809e6794630e6634f070647d6d51145b2a8d644209e",
+      "blockNumber": "69655262",
+      "constructorArgs": [
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        "0x52568fe53bc59c2aac6295ec351f928d8abbce92",
+        "0x88b9d58a32b279b959bbb1f7143a7f18aaf2da58"
+      ],
+      "runtimeHash": "0x775e24f8f3cdc08c3afadc72410cbd7f92029672a31c90a7e500f262f15b97b3"
+    },
+    "AgentWalletFactoryV3": {
+      "address": "0x5d89f395e912283d9b8814cf288414544321443c",
+      "txHash": "0xe316fcf91e7518d7a6a4e5faed4fa68a8fd0b913dfe20786fb9a4ffe7fd3bca6",
+      "blockNumber": "69655266",
+      "constructorArgs": [
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        30,
+        [
+          "0x3600000000000000000000000000000000000000"
+        ],
+        "0x3699e8425a44f03bfd63bd754795ea10a1349b1e",
+        "0x52568fe53bc59c2aac6295ec351f928d8abbce92",
+        "0x88b9d58a32b279b959bbb1f7143a7f18aaf2da58"
+      ],
+      "runtimeHash": "0xd2e2021ffd33453993c2fc421c26c68f0cf203463633415bb8aabfc4fee69167"
+    },
+    "AgentRegistry": {
+      "address": "0x2cbd940026b423e0fbeb04bc4c827d21578ce699",
+      "txHash": "0x2224b74ae4a657c36efcd9ff84d9d67f0ccc973d89996eb7bddb31a56a31666c",
+      "blockNumber": "69655276",
+      "constructorArgs": [
+        [
+          "0x3662ab96c961915df01e141b62a2b785d0495790",
+          "0xf3432dba7143e9c027a2b9496b78fff9989c6448",
+          "0x5d89f395e912283d9b8814cf288414544321443c",
+          "0xdae395f504be412ddfc0646b37ac1840a1462c08",
+          "0x92f357b256f5fb6a0f7e635a29462601c1cb6547"
+        ]
+      ],
+      "runtimeHash": "0x29d27d2ef2ae0a903bd2321a642e7b108b2053f154fa586ad22ac4109fa46b07"
+    }
+  },
+  "configurationTransactions": [
+    "0x3982c1c0f493b0c3d99295c8493eaeec87ae1bc39dbba516771eb19cca999c75",
+    "0x9e3ed38b9289f7ec6e7b46a896074c02aa0142e9443ff3d8a61dffec0a25a14c",
+    "0x4cc3f678a17fd1a5bf78ca7db47a3471ddfecdf7ddd84edfd5c0b92f63d84312",
+    "0xe01f9fe4025eca17c1a7f12fc57d1655e0ac8d4c12a118a73453d6fb93517ca7"
+  ],
+  "build": {
+    "solc": "0.8.28",
+    "optimizerRuns": 200,
+    "evmVersion": "cancun",
+    "sourceHashes": {
+      "AgentRegistry.sol": "0x9038b66b9c6829cbe0bec5dc01018180ba29a0168e336cac0258d149484e343f",
+      "AgentWallet.sol": "0x9f0c6eb4333d73298501a7c10e20119418f6810f5e18b4efed0a0bc839349544",
+      "AgentWalletFactory.sol": "0x95b9000f6d764543cc4cfa917c219836b3fe5b7984297ddce022e845161f67f2",
+      "AgentWalletFactoryV2.sol": "0xf167a47b09e357cc62d4ac33206c00a5673d59b1be82a11b322f6a541fd75963",
+      "AgentWalletFactoryV3.sol": "0xec38377e21230ba271615e2328efafd6d65235dd3839de1bce4cab43712705bb",
+      "AgentWalletV2.sol": "0xbf3bad4b501450d799e2e24430e6b66658c2a646d72a153e34a608fec5164544",
+      "AgentWalletV3.sol": "0xa8d45c2863895c97f8216020f375c65dffd720e5a56969b51698a3984093982a",
+      "CallReceipts.sol": "0x0100fc7ef8e312afd0983b6615b37d96529afcb30c68cdf60000e80b6684d4dd",
+      "DisputeVault.sol": "0x8bff8a5651ab7d7da6be6e19e2deb9bed181cfc1ff5fbc74eb03cab78bf10452",
+      "ISwapAdapter.sol": "0xddcf535c6260d3134ad490efdb6bd3cf3c41c284df062a9841efc157178e1593",
+      "ProviderRegistry.sol": "0x446da633777d0b09ff60f9381aafa798f97db57314b7c5e8c1aa018a232055bb",
+      "ReputationRegistry.sol": "0x76ab524a5cd8ec93bf87eeaca5116b5b4dec2ebabae581da7c1dcc0bcffc573e",
+      "WalletProvenance.sol": "0xeaaf860eb6c2f6c37644b18b4fe87f1a6361308eeee713ef2ed3880103e18a2e"
+    }
+  }
+}

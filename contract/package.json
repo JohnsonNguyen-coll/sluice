@@ -7,7 +7,8 @@
     "build": "node scripts/forge.mjs build",
     "test": "node scripts/forge.mjs test",
     "deploy:self": "bun run scripts/self-deploy.ts",
-    "compass:deploy": "bun run scripts/compass-deploy.ts"
+    "compass:deploy": "bun run scripts/compass-deploy.ts",
+    "deploy:phase3": "bun --env-file=../backend/.env --env-file=.env run scripts/deploy-phase3.ts"
   },
   "dependencies": {
     "viem": "2.57.5",

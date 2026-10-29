@@ -10,8 +10,13 @@ Sluice AgentPay Core: production payment layer for AI agents. Pay-per-call USDC 
 
 | Network | Version | Contract | Address |
 |---|---|---|---|
-| Arc Testnet | V1 | `AgentWalletFactory` | `0xdae395f504be412ddfc0646b37ac1840a1462c08` |
-| Arc Testnet | V2 | `AgentWalletFactoryV2` | `0x92f357b256f5fb6a0f7e635a29462601c1cb6547` |
+| Arc Testnet | V1 | `AgentWalletFactory` | `0x3662ab96c961915df01e141b62a2b785d0495790` |
+| Arc Testnet | V2 | `AgentWalletFactoryV2` | `0xf3432dba7143e9c027a2b9496b78fff9989c6448` |
+| Arc Testnet | V3 | `AgentWalletFactoryV3` | `0x5d89f395e912283d9b8814cf288414544321443c` |
+| Arc Testnet | V3 | `AgentRegistry` | `0x2cbd940026b423e0fbeb04bc4c827d21578ce699` |
+| Arc Testnet | V3 | `ProviderRegistry` | `0x52568fe53bc59c2aac6295ec351f928d8abbce92` |
+| Arc Testnet | V3 | `ReputationRegistry` | `0x88b9d58a32b279b959bbb1f7143a7f18aaf2da58` |
+| Arc Testnet | V3 | `DisputeVault` | `0x3699e8425a44f03bfd63bd754795ea10a1349b1e` |
 
 Full deployment record: `contract/deployments/arc-testnet.json`
 
@@ -84,26 +89,28 @@ See `docs/DECISIONS.md` for full rationale.
 | `FEE_RECIPIENT` | Initial protocol fee recipient address |
 | `FEE_BPS` | Protocol fee in basis points (0–500) |
 
-## Current phase (reviewed 2026-10-28)
+## Current phase (reviewed 2026-10-29)
 
-Phase 3 contract work is in progress: AgentRegistry, ProviderRegistry,
-ReputationRegistry, DisputeVault, AgentWalletV3 and AgentWalletFactoryV3 exist.
-See `docs/PHASE3_STATUS.md` for the verified checkpoint and remaining work;
-do not infer completion from existing contract files or historical test counts.
+The user explicitly authorized completing the remaining Phase 3 work after the
+earlier registry/dispute checkpoints. Contracts, signed receipts, factory-provenance
+onboarding, SDK/middleware, Supabase persistence and dashboard/API integration are implemented.
+See `docs/PHASE3_STATUS.md` and `docs/PHASE3_DELIVERY.md` for actual validation and limitations.
 
-The SDK (`packages/sdk`) and middleware (`packages/middleware`) directories are
-absent in this checkout. Receipts and end-to-end integrations still require work.
-Earlier V3 deployment records exist in `contract/metadata`, while
-`contract/deployments/arc-testnet.json` currently lists only V1/V2. Non-upgradeable deployed
-instances do not receive local source fixes; new deployments are required.
+SDK and middleware live in `backend/packages/sdk` and `backend/packages/middleware`.
+They are private local workspaces, not published npm packages. The canonical manifest
+now lists a fresh coordinated V1/V2/V3 release and retains historical factories.
+Non-upgradeable deployed instances do not receive local fixes or migrate balances.
 
-The supplied Phase 3 work order requires stopping to show results after the
-registry/test checkpoint, before proceeding to receipts.
+Real testnet paid calls, receipts, clean release, provider-accepted refund and arbiter
+split are confirmed. Silence refund and arbiter timeout are opened and await real
+3-day deadlines; do not claim those transactions are complete. Resume using
+`contract/scripts/phase3-testnet-e2e.ts` and the persisted transaction report.
+Keep private keys/state in ignored .env/.tools files; never print or commit them.
 
 ## Workspace layout
 
 - `contract/`: Solidity in `src/`, Foundry tests/scripts/lib, deployment tooling, metadata and deployment records.
 - `frontend/`: Next.js app, public assets, web config/tests and `docs/WEBSITE.md`.
-- `backend/`: reserved backend source plus the original integration examples; no runnable server yet.
+- `backend/`: Bun API, private Supabase schema, SDK/middleware packages and integration examples.
 - Run web commands from the repository root or `frontend/`; run Foundry directly from `contract/`.
 - Canonical generated chain facts are in `contract/config/onchain-facts.ts`; the frontend keeps a re-export compatibility entry point.
