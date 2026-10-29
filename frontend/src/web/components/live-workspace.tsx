@@ -27,6 +27,8 @@ import {
 } from "@sluice/sdk";
 import { useApi, ApiConnection, ApiSignIn } from "./api-session";
 import { ReceiptRecords, EvidenceRecords } from "./receipt-records";
+import { WalletHub } from "./wallet-hub";
+import { WalletControl } from "./wallet-control";
 import {
   Button,
   ButtonLink,
@@ -170,17 +172,21 @@ function useTransaction() {
   const client = usePublicClient(),
     { data: wallet } = useWalletClient(),
     { config, refresh } = useApi();
+  const [phase, setPhase] = useState("");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [hash, setHash] = useState<Hex>();
   async function execute(action: () => Promise<void>) {
     setBusy(true);
+    setPhase("Checking this action against the contract…");
     setError("");
     setHash(undefined);
     try {
       await action();
+      setPhase("Confirmed on Arc Testnet.");
       refresh();
     } catch (error) {
+      setPhase("");
       setError(
         error instanceof Error
           ? error.message.split("\n")[0]
@@ -207,12 +213,14 @@ function useTransaction() {
       args,
       account: wallet.account,
     });
+    setPhase("Confirm this transaction in your wallet.");
     const tx = await wallet.writeContract({
       ...request,
       account: wallet.account,
       chain: wallet.chain,
     });
     setHash(tx);
+    setPhase("Transaction sent. Waiting for network confirmation…");
     const receipt = await client.waitForTransactionReceipt({ hash: tx });
     if (receipt.status !== "success") throw Error("Transaction reverted");
     return receipt;
@@ -223,7 +231,11 @@ function useTransaction() {
     write,
     status: (
       <div aria-live="polite">
-        {busy && <p>Confirm in your wallet, then wait for confirmation…</p>}
+        {phase && (
+          <p className="transaction-feedback" role="status">
+            {phase}
+          </p>
+        )}
         {error && (
           <p role="alert" className="live-error">
             {error}
@@ -243,65 +255,19 @@ function useTransaction() {
     ),
   };
 }
-function WalletList() {
-  const { address } = useAccount();
-  const state = useRead<{
-    items: { wallet: Address; version: number }[];
-    total: number;
-  }>(address ? "/wallets?owner=" + address : null);
-  return (
-    <Card>
-      <div className="section-heading compact">
-        <h2>Your agent wallets</h2>
-        <ButtonLink href="/app/wallets/new">Create wallet</ButtonLink>
-      </div>
-      <ReadStatus {...state} />
-      {!address ? (
-        <p>Connect a wallet to load its agent accounts.</p>
-      ) : state.value?.items.length ? (
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Agent wallet</th>
-                <th>Version</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.value.items.map((item) => (
-                <tr key={item.wallet}>
-                  <td>
-                    <Link href={routes.wallet(item.wallet)}>
-                      {shortAddress(item.wallet)}
-                    </Link>
-                  </td>
-                  <td>V{item.version}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="muted small">
-            Showing {state.value.items.length} of {state.value.total} factory
-            creation records.
-          </p>
-        </div>
-      ) : !state.loading && !state.error ? (
-        <p>No agent wallets were created for this address.</p>
-      ) : null}
-    </Card>
-  );
-}
 function CreateWallet() {
   const { config } = useApi(),
     { address } = useAccount(),
     router = useRouter(),
     tx = useTransaction();
   return (
-    <Card>
-      <h2>A separate wallet for your agent</h2>
+    <Card className="create-payment-wallet">
+      <div className="form-step-label">STEP 1 OF 3 · CREATE A WALLET</div>
+      <h2>A payment wallet you control</h2>
       <p>
         Keep ownership in your connected wallet. Enter the agent’s public
-        signing address.
+        signing address. This creates a payment account, not an AI agent. You
+        can fund it and connect your agent after creation.
       </p>
       <form
         className="live-form"
@@ -343,31 +309,48 @@ function CreateWallet() {
           });
         }}
       >
-        <label className="live-field">
-          <span>Wallet version</span>
-          <select
-            name="version"
-            defaultValue={
-              config?.factories.some((f) => f.version === 3) ? "3" : "2"
-            }
-          >
-            {[3, 2, 1]
-              .filter((v) => config?.factories.some((f) => f.version === v))
-              .map((v) => (
-                <option key={v} value={v}>
-                  V{v}
-                </option>
-              ))}
-          </select>
-        </label>
-        <Field label="Agent signing address" name="signer" />
-        <Field
-          label="Settlement grace (seconds)"
-          name="window"
-          defaultValue="3600"
-          type="number"
-        />
-        <Button disabled={tx.busy || !address}>Create agent wallet</Button>
+        <Field label="Your agent’s public signing address" name="signer" />
+        <p className="field-help">
+          Paste the public address used by your agent’s signing key. Never paste
+          a private key.{" "}
+          <Link href="/docs/quickstart/agent">How to connect an agent ↗</Link>
+        </p>
+        <details className="workspace-disclosure">
+          <summary>Advanced wallet settings</summary>
+          <label className="live-field">
+            <span>Contract version</span>
+            <select name="version" defaultValue="3">
+              {[3, 2, 1]
+                .filter((v) => config?.factories.some((f) => f.version === v))
+                .map((v) => (
+                  <option key={v} value={v}>
+                    V{v}
+                    {v === 3
+                      ? " — Recommended · receipts & refunds"
+                      : " — Legacy compatibility"}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <Field
+            label="Time to finish pending payments (seconds)"
+            name="window"
+            defaultValue="3600"
+            type="number"
+          />
+          <p className="field-help">
+            Existing payment authorizations remain valid during this period when
+            you pause, change keys or lower a budget. Minimum: 10 minutes.
+          </p>
+        </details>
+        {!address && (
+          <p className="field-help">
+            Connect your wallet using the button in the navigation to continue.
+          </p>
+        )}
+        <Button disabled={tx.busy || !address || !config}>
+          {tx.busy ? "Creating your wallet…" : "Create payment wallet"}
+        </Button>
       </form>
       {tx.status}
     </Card>
@@ -385,9 +368,12 @@ function WalletDetail({
     client = usePublicClient(),
     { revision, config } = useApi(),
     tx = useTransaction();
-  const [balance, setBalance] = useState<string>(),
-    [budgetProvider, setBudgetProvider] = useState("");
-  const budget = useRead<unknown>(
+  const [budgetProvider, setBudgetProvider] = useState("");
+  const budget = useRead<{
+    budget: [string, string];
+    settled: string;
+    nonce: string;
+  }>(
     isAddress(budgetProvider)
       ? "/wallets/" +
           record +
@@ -400,31 +386,47 @@ function WalletDetail({
   const activity = useRead<{ items: LogRecord[] }>(
     section === "wallet-activity" ? "/wallets/" + record + "/activity" : null,
   );
-  useEffect(() => {
-    let disposed = false;
-    if (client && isAddress(record))
-      void client
-        .readContract({
+  const balanceRead = useQuery({
+    queryKey: ["payment-wallet-balance", record, revision],
+    enabled: !!client && isAddress(record),
+    retry: false,
+    queryFn: async () =>
+      formatUnits(
+        await client!.readContract({
           address: siteConfig.usdc as Address,
           abi: erc20,
           functionName: "balanceOf",
-          args: [record],
-        })
-        .then((value) => {
-          if (!disposed) setBalance(formatUnits(value, 6));
-        })
-        .catch(() => {
-          if (!disposed) setBalance(undefined);
-        });
-    return () => {
-      disposed = true;
-    };
-  }, [client, record, revision]);
+          args: [record as Address],
+        }),
+        6,
+      ),
+  });
+  const balance = balanceRead.data;
+  const dailyLimitRead = useQuery({
+    queryKey: ["wallet-daily-limit", record, state.value?.version, revision],
+    enabled: !!client && !!state.value,
+    retry: false,
+    queryFn: async () =>
+      client!.readContract({
+        address: record as Address,
+        abi: walletAbis[state.value!.version],
+        functionName:
+          state.value!.version === 1 ? "dailyLimit" : "dailyLimitUsdE6",
+      }) as Promise<bigint>,
+  });
   const w = state.value,
     isOwner = !!w && address?.toLowerCase() === w.owner.toLowerCase();
   return (
     <>
       <ReadStatus {...state} />
+      {balanceRead.error && (
+        <Callout title="Balance unavailable" tone="warn">
+          We couldn’t read this wallet’s USDC balance.{" "}
+          <Button variant="ghost" onClick={() => void balanceRead.refetch()}>
+            Retry balance
+          </Button>
+        </Callout>
+      )}
       {w && (
         <>
           <div className="grid-three app-stats">
@@ -440,213 +442,413 @@ function WalletDetail({
               </span>
             </Stat>
           </div>
-          <Card>
-            <h2>Wallet owner</h2>
-            <AddressChip address={w.owner} />
-          </Card>
-          <ReceiptRecords wallet={w.address} />
+          {section === "wallet-settings" && (
+            <Card>
+              <h2>Wallet owner</h2>
+              <AddressChip address={w.owner} />
+            </Card>
+          )}
+          {section === "wallet" && (
+            <div className="wallet-next-actions">
+              <div>
+                <strong>Next: set a spending limit</strong>
+                <p>
+                  Your agent needs an allowance for each API provider before it
+                  can pay.
+                </p>
+              </div>
+              <ButtonLink
+                href={routes.wallet(w.address, "budgets")}
+                variant="secondary"
+              >
+                Set spending limits
+              </ButtonLink>
+              <ButtonLink href="/docs/quickstart/agent" variant="ghost">
+                Connect your agent
+              </ButtonLink>
+            </div>
+          )}
+          {section === "wallet" && <ReceiptRecords wallet={w.address} />}
           {section === "wallet-activity" ? (
             <EventTable logs={activity.value?.items || []} state={activity} />
           ) : (
             <>
-              <Card>
-                <h2>Provider budget</h2>
-                <label className="live-field">
-                  <span>Provider address to inspect</span>
-                  <input
-                    value={budgetProvider}
-                    onChange={(e) => setBudgetProvider(e.target.value)}
-                  />
-                </label>
-                <ReadStatus {...budget} />
-                {budget.value !== undefined && (
-                  <CodeBlock
-                    code={text(budget.value)}
-                    language="json"
-                    filename="On-chain budget"
-                  />
-                )}
-              </Card>
+              {section === "wallet-budgets" && (
+                <Card>
+                  <h2>Check a provider’s spending limit</h2>
+                  <p className="muted small">
+                    A provider is the API service your agent pays. Enter its
+                    payment address to see your allowance and confirmed
+                    spending.
+                  </p>
+                  <label className="live-field">
+                    <span>Provider address to inspect</span>
+                    <input
+                      value={budgetProvider}
+                      onChange={(e) => setBudgetProvider(e.target.value)}
+                    />
+                  </label>
+                  <ReadStatus {...budget} />
+                  {budget.value !== undefined && (
+                    <div>
+                      <dl className="readable-facts">
+                        <div>
+                          <dt>Total allowance</dt>
+                          <dd>
+                            {formatUnits(BigInt(budget.value.budget[0]), 6)}{" "}
+                            USDC
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Already collected</dt>
+                          <dd>
+                            {formatUnits(BigInt(budget.value.settled), 6)} USDC
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Per-collection limit</dt>
+                          <dd>
+                            {budget.value.budget[1] === "0"
+                              ? "No cap"
+                              : formatUnits(BigInt(budget.value.budget[1]), 6) +
+                                " USDC"}
+                          </dd>
+                        </div>
+                      </dl>
+                      <details className="workspace-disclosure">
+                        <summary>Technical details</summary>
+                        <CodeBlock
+                          code={text(budget.value)}
+                          language="json"
+                          filename="On-chain budget"
+                        />
+                      </details>
+                    </div>
+                  )}
+                </Card>
+              )}
               {isOwner && (
                 <div className="live-grid">
-                  <Card>
-                    <h2>Fund your agent</h2>
-                    <form
-                      className="live-form"
-                      onSubmit={(event) => {
-                        const form = data(event);
-                        void tx.execute(async () => {
-                          const amount = parseUnits(
-                            String(form.get("amount")),
-                            6,
-                          );
-                          if (amount <= 0n)
-                            throw Error("Amount must be positive");
-                          await tx.write(
-                            siteConfig.usdc as Address,
-                            erc20,
-                            "approve",
-                            [w.address, amount],
-                          );
-                          await tx.write(
-                            w.address,
-                            walletAbis[w.version],
-                            "deposit",
-                            w.version === 1
-                              ? [amount]
-                              : [siteConfig.usdc, amount],
-                          );
-                        });
-                      }}
-                    >
-                      <Field label="Amount (USDC)" name="amount" />
+                  {section === "wallet" && (
+                    <Card>
+                      <h2>Add money to this wallet</h2>
                       <p className="muted small">
-                        Your wallet will approve USDC, then deposit it into the
+                        Transfer testnet USDC from your connected wallet. You’ll
+                        confirm an allowance, then the deposit.
+                      </p>
+                      <form
+                        className="live-form"
+                        onSubmit={(event) => {
+                          const form = data(event);
+                          void tx.execute(async () => {
+                            const amount = parseUnits(
+                              String(form.get("amount")),
+                              6,
+                            );
+                            if (amount <= 0n)
+                              throw Error("Amount must be positive");
+                            await tx.write(
+                              siteConfig.usdc as Address,
+                              erc20,
+                              "approve",
+                              [w.address, amount],
+                            );
+                            await tx.write(
+                              w.address,
+                              walletAbis[w.version],
+                              "deposit",
+                              w.version === 1
+                                ? [amount]
+                                : [siteConfig.usdc, amount],
+                            );
+                          });
+                        }}
+                      >
+                        <Field label="Amount (USDC)" name="amount" />
+                        <p className="muted small">
+                          Your wallet will approve USDC, then deposit it into
+                          the agent wallet.
+                        </p>
+                        <Button disabled={tx.busy}>Approve and deposit</Button>
+                      </form>
+                    </Card>
+                  )}
+                  {section === "wallet" && (
+                    <Card>
+                      <h2>Withdraw available USDC</h2>
+                      <p className="muted small">
+                        Return unreserved funds to your connected owner wallet.
+                        Provider allowances and pending-payment protections can
+                        restrict the available amount.
+                      </p>
+                      <form
+                        className="live-form"
+                        onSubmit={(event) => {
+                          const form = data(event);
+                          void tx.execute(async () => {
+                            const amount = parseUnits(
+                              String(form.get("withdrawAmount")),
+                              6,
+                            );
+                            if (amount <= 0n)
+                              throw Error("Enter an amount greater than zero");
+                            if (!client)
+                              throw Error("Network connection unavailable");
+                            const free = (await client.readContract({
+                              address: w.address,
+                              abi: walletAbis[w.version],
+                              functionName: "freeBalance",
+                              args: w.version === 1 ? [] : [siteConfig.usdc],
+                            })) as bigint;
+                            if (amount > free)
+                              throw Error(
+                                "Only " +
+                                  formatUnits(free, 6) +
+                                  " USDC is available to withdraw. Lower reserved provider budgets and wait for pending-payment protections if needed.",
+                              );
+                            await tx.write(
+                              w.address,
+                              walletAbis[w.version],
+                              "withdraw",
+                              w.version === 1
+                                ? [amount]
+                                : [siteConfig.usdc, amount],
+                            );
+                          });
+                        }}
+                      >
+                        <Field
+                          label="Amount to withdraw (USDC)"
+                          name="withdrawAmount"
+                        />
+                        <p className="field-help">
+                          Destination: your owner wallet {shortAddress(w.owner)}
+                          . The contract checks availability and any pause
+                          cooldown before withdrawal.
+                        </p>
+                        <Button variant="secondary" disabled={tx.busy}>
+                          Withdraw to my wallet
+                        </Button>
+                      </form>
+                    </Card>
+                  )}
+                  {section === "wallet-budgets" && (
+                    <Card>
+                      <h2>Daily spending limit</h2>
+                      <p className="muted small">
+                        Limit the total amount providers can collect in a UTC
+                        day. This is checked when payments settle, not when your
+                        agent makes a call.
+                      </p>
+                      <p className="field-help">
+                        Current limit:{" "}
+                        {dailyLimitRead.data === undefined
+                          ? "Unavailable"
+                          : dailyLimitRead.data === 0n
+                            ? "No daily limit"
+                            : formatUnits(dailyLimitRead.data, 6) +
+                              (w.version === 1 ? " USDC" : " USD equivalent")}
+                      </p>
+                      <form
+                        className="live-form"
+                        onSubmit={(event) => {
+                          const form = data(event);
+                          void tx.execute(async () => {
+                            const limit = parseUnits(
+                              String(form.get("dailyLimit")),
+                              6,
+                            );
+                            if (limit < 0n)
+                              throw Error("Daily limit cannot be negative");
+                            await tx.write(
+                              w.address,
+                              walletAbis[w.version],
+                              "setDailyLimit",
+                              [limit],
+                            );
+                          });
+                        }}
+                      >
+                        <Field
+                          label={
+                            w.version === 1
+                              ? "Daily limit (USDC)"
+                              : "Daily limit (USD equivalent)"
+                          }
+                          name="dailyLimit"
+                        />
+                        <p className="field-help">
+                          Enter 0 for no daily limit. Multi-token wallets use
+                          the token rates configured on-chain.
+                        </p>
+                        <Button disabled={tx.busy}>Save daily limit</Button>
+                      </form>
+                    </Card>
+                  )}
+                  {section === "wallet-budgets" && (
+                    <Card>
+                      <h2>Set spending limits</h2>
+                      <p className="muted small">
+                        Choose how much this API provider can collect from your
                         agent wallet.
                       </p>
-                      <Button disabled={tx.busy}>Approve and deposit</Button>
-                    </form>
-                  </Card>
-                  <Card>
-                    <h2>Set spending limits</h2>
-                    <form
-                      className="live-form"
-                      onSubmit={(event) => {
-                        const form = data(event);
-                        void tx.execute(async () => {
-                          const provider = addr(form.get("provider")),
-                            action = String(
-                              form.get("action") || "setProviderBudget",
-                            );
-                          if (action === "executeBudgetDecrease") {
-                            await tx.write(
-                              w.address,
-                              walletAbis[w.version],
-                              action,
-                              w.version === 1
-                                ? [provider]
-                                : [provider, siteConfig.usdc],
-                            );
-                          } else {
-                            const total = parseUnits(
-                                String(form.get("total")),
-                                6,
-                              ),
-                              cap = parseUnits(String(form.get("cap")), 6);
-                            await tx.write(
-                              w.address,
-                              walletAbis[w.version],
-                              action,
-                              w.version === 1
-                                ? [provider, total, cap]
-                                : [provider, siteConfig.usdc, total, cap],
-                            );
-                          }
-                        });
-                      }}
-                    >
-                      <label className="live-field">
-                        <span>Budget action</span>
-                        <select name="action">
-                          <option value="setProviderBudget">
-                            Increase budget
-                          </option>
-                          <option value="requestBudgetDecrease">
-                            Request a decrease
-                          </option>
-                          <option value="executeBudgetDecrease">
-                            Apply matured decrease
-                          </option>
-                        </select>
-                      </label>
-                      <Field label="Provider address" name="provider" />
-                      <Field
-                        label="Cumulative budget (USDC)"
-                        name="total"
-                        defaultValue="0"
-                      />
-                      <Field
-                        label="Unsettled payment cap (USDC; 0 = none)"
-                        name="cap"
-                        defaultValue="1"
-                      />
-                      <p className="muted small">
-                        Decreases wait for the settlement grace period. Applying
-                        a matured decrease uses the provider address only.
-                      </p>
-                      <Button disabled={tx.busy}>Submit budget action</Button>
-                    </form>
-                  </Card>
-                  <Card>
-                    <h2>Pause and rotate</h2>
-                    <Button
-                      variant="secondary"
-                      disabled={tx.busy}
-                      onClick={() =>
-                        void tx.execute(async () => {
-                          await tx.write(
-                            w.address,
-                            walletAbis[w.version],
-                            w.paused ? "unpause" : "pause",
-                            [],
-                          );
-                        })
-                      }
-                    >
-                      {w.paused ? "Resume payments" : "Pause payments"}
-                    </Button>
-                    <form
-                      className="live-form"
-                      onSubmit={(event) => {
-                        const form = data(event);
-                        void tx.execute(async () => {
-                          await tx.write(
-                            w.address,
-                            walletAbis[w.version],
-                            "rotateAgentSigner",
-                            [addr(form.get("signer"))],
-                          );
-                        });
-                      }}
-                    >
-                      <Field label="New agent signer" name="signer" />
-                      <Button disabled={tx.busy}>Rotate signer</Button>
-                    </form>
-                  </Card>
-                  {config?.contracts.agentRegistry && (
+                      <form
+                        className="live-form"
+                        onSubmit={(event) => {
+                          const form = data(event);
+                          void tx.execute(async () => {
+                            const provider = addr(form.get("provider")),
+                              action = String(
+                                form.get("action") || "setProviderBudget",
+                              );
+                            if (action === "executeBudgetDecrease") {
+                              await tx.write(
+                                w.address,
+                                walletAbis[w.version],
+                                action,
+                                w.version === 1
+                                  ? [provider]
+                                  : [provider, siteConfig.usdc],
+                              );
+                            } else {
+                              const total = parseUnits(
+                                  String(form.get("total")),
+                                  6,
+                                ),
+                                cap = parseUnits(String(form.get("cap")), 6);
+                              await tx.write(
+                                w.address,
+                                walletAbis[w.version],
+                                action,
+                                w.version === 1
+                                  ? [provider, total, cap]
+                                  : [provider, siteConfig.usdc, total, cap],
+                              );
+                            }
+                          });
+                        }}
+                      >
+                        <label className="live-field">
+                          <span>Budget action</span>
+                          <select name="action">
+                            <option value="setProviderBudget">
+                              Increase budget
+                            </option>
+                            <option value="requestBudgetDecrease">
+                              Request a decrease
+                            </option>
+                            <option value="executeBudgetDecrease">
+                              Apply matured decrease
+                            </option>
+                          </select>
+                        </label>
+                        <Field label="Provider address" name="provider" />
+                        <Field
+                          label="Total allowance for this provider (USDC)"
+                          name="total"
+                          defaultValue="0"
+                        />
+                        <Field
+                          label="Maximum per collection (USDC; 0 = no cap)"
+                          name="cap"
+                          defaultValue="1"
+                        />
+                        <p className="muted small">
+                          The per-collection cap limits each provider
+                          settlement, which may contain several API calls.
+                          Decreases wait for the settlement grace period.
+                          Applying a matured decrease uses the provider address
+                          only.
+                        </p>
+                        <Button disabled={tx.busy}>Submit budget action</Button>
+                      </form>
+                    </Card>
+                  )}
+                  {section === "wallet-settings" && (
                     <Card>
-                      <h2>Register agent identity</h2>
+                      <h2>Payment controls</h2>
+                      <p className="muted small">
+                        Pause new payments or replace your agent’s signing
+                        address. Previously signed payments keep their
+                        settlement grace period.
+                      </p>
+                      <Button
+                        variant="secondary"
+                        disabled={tx.busy}
+                        onClick={() =>
+                          void tx.execute(async () => {
+                            await tx.write(
+                              w.address,
+                              walletAbis[w.version],
+                              w.paused ? "unpause" : "pause",
+                              [],
+                            );
+                          })
+                        }
+                      >
+                        {w.paused ? "Resume payments" : "Pause payments"}
+                      </Button>
                       <form
                         className="live-form"
                         onSubmit={(event) => {
                           const form = data(event);
                           void tx.execute(async () => {
                             await tx.write(
-                              config.contracts.agentRegistry!,
-                              agentAbi,
-                              "registerWithMetadataHash",
-                              [
-                                w.address,
-                                keccak256(toHex(String(form.get("metadata")))),
-                              ],
+                              w.address,
+                              walletAbis[w.version],
+                              "rotateAgentSigner",
+                              [addr(form.get("signer"))],
                             );
                           });
                         }}
                       >
-                        <label className="live-field">
-                          <span>
-                            Metadata JSON (only its hash goes on-chain)
-                          </span>
-                          <textarea
-                            name="metadata"
-                            required
-                            placeholder={'{"name":"My agent"}'}
-                          />
-                        </label>
-                        <Button disabled={tx.busy}>Register identity</Button>
+                        <Field label="New agent signer" name="signer" />
+                        <Button disabled={tx.busy}>Rotate signer</Button>
                       </form>
                     </Card>
                   )}
+                  {section === "wallet-settings" &&
+                    config?.contracts.agentRegistry && (
+                      <Card>
+                        <h2>Register your agent’s identity</h2>
+                        <p className="muted small">
+                          Optional: publish a fingerprint of your agent’s
+                          profile. Profile content stays off-chain; only its
+                          hash is stored.
+                        </p>
+                        <form
+                          className="live-form"
+                          onSubmit={(event) => {
+                            const form = data(event);
+                            void tx.execute(async () => {
+                              await tx.write(
+                                config.contracts.agentRegistry!,
+                                agentAbi,
+                                "registerWithMetadataHash",
+                                [
+                                  w.address,
+                                  keccak256(
+                                    toHex(String(form.get("metadata"))),
+                                  ),
+                                ],
+                              );
+                            });
+                          }}
+                        >
+                          <label className="live-field">
+                            <span>
+                              Metadata JSON (only its hash goes on-chain)
+                            </span>
+                            <textarea
+                              name="metadata"
+                              required
+                              placeholder={'{"name":"My agent"}'}
+                            />
+                          </label>
+                          <Button disabled={tx.busy}>Register identity</Button>
+                        </form>
+                      </Card>
+                    )}
                 </div>
               )}
               {tx.status}
@@ -666,7 +868,7 @@ function EventTable({
 }) {
   return (
     <Card>
-      <h2>Recent confirmed activity</h2>
+      <h2>Payment activity</h2>
       <p className="muted small">
         Recent block-window results, not a complete historical index.
       </p>
@@ -684,7 +886,21 @@ function EventTable({
           <tbody>
             {logs.map((log, i) => (
               <tr key={log.transactionHash + ":" + i}>
-                <td>{log.eventName}</td>
+                <td>
+                  {(
+                    {
+                      Deposited: "Money added",
+                      Withdrawn: "Money withdrawn",
+                      Settled: "Payment collected",
+                      Paused: "Payments paused",
+                      Unpaused: "Payments resumed",
+                      ProviderBudgetSet: "Spending limit updated",
+                      DisputeOpened: "Refund requested",
+                      SettlementReceived: "Payment held",
+                    } as Record<string, string>
+                  )[log.eventName] ||
+                    log.eventName.replace(/([a-z])([A-Z])/g, "$1 $2")}
+                </td>
                 <td>{log.blockNumber}</td>
                 <td>
                   <a
@@ -735,6 +951,21 @@ function ProviderPanel() {
       address && config?.contracts.reputationRegistry
         ? "/reputation/" + address
         : null,
+    );
+  if (!address)
+    return (
+      <Card className="provider-welcome">
+        <h2>Get paid when an agent uses your API</h2>
+        <p>
+          Connect the wallet that will represent your API service. Register its
+          payout address and refund period, then add the middleware to your
+          server.
+        </p>
+        <WalletControl />
+        <ButtonLink href="/docs/quickstart/provider" variant="ghost">
+          Read the integration guide
+        </ButtonLink>
+      </Card>
     );
   if (!config?.contracts.providerRegistry)
     return (
@@ -843,14 +1074,21 @@ function ProviderPanel() {
         {tx.status}
       </Card>
       <Card>
-        <h2>Verifiable reputation</h2>
+        <h2>Provider history</h2>
+        <p className="muted small">
+          Recorded payment and refund counters from the protocol. These are
+          activity records, not a guarantee of service quality.
+        </p>
         <ReadStatus {...reputation} />
         {reputation.value !== undefined ? (
-          <CodeBlock
-            filename="Raw counters"
-            language="json"
-            code={text(reputation.value)}
-          />
+          <details className="workspace-disclosure">
+            <summary>View verified activity counters</summary>
+            <CodeBlock
+              filename="On-chain counters"
+              language="json"
+              code={text(reputation.value)}
+            />
+          </details>
         ) : (
           <p>Connect a provider wallet to inspect its history.</p>
         )}
@@ -859,7 +1097,7 @@ function ProviderPanel() {
   );
 }
 function DisputePanel({ record }: { record: string }) {
-  const { config, request } = useApi(),
+  const { config, request, signedIn } = useApi(),
     { address } = useAccount(),
     client = usePublicClient(),
     tx = useTransaction(),
@@ -884,6 +1122,13 @@ function DisputePanel({ record }: { record: string }) {
     !!address &&
     !!ownerState.value &&
     address.toLowerCase() === ownerState.value.owner.toLowerCase();
+  const receiptOptions = useRead<{
+    items: { receipt: SignedReceipt; commitment?: { settlementId: string } }[];
+  }>(
+    ownsWallet && signedIn && s
+      ? "/receipts?wallet=" + s.wallet + "&limit=100"
+      : null,
+  );
   async function evidenceHash() {
     if (!evidence.trim()) return toHex(0, { size: 32 });
     const saved = await request<{ evidenceHash: Hex }>(
@@ -906,8 +1151,17 @@ function DisputePanel({ record }: { record: string }) {
       {s && (
         <>
           <div className="grid-three app-stats">
-            <Stat label="Held payment" hint="Token base units">
-              {s.amount}
+            <Stat
+              label="Payment held"
+              hint={
+                s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                  ? "USDC · held in the refund vault"
+                  : "Token base units"
+              }
+            >
+              {s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                ? formatUnits(BigInt(s.amount), 6) + " USDC"
+                : s.amount}
             </Stat>
             <Stat label="State" hint="Live vault state">
               {["Held", "Released", "Disputed", "Split", "Refunded"][s.state]}
@@ -937,7 +1191,7 @@ function DisputePanel({ record }: { record: string }) {
             </p>
           </Card>
           <ApiSignIn />
-              {d && <EvidenceRecords id={record} />}
+          {d && <EvidenceRecords id={record} />}
           {d && (
             <Card>
               <h2>Dispute timeline</h2>
@@ -1073,26 +1327,47 @@ function DisputePanel({ record }: { record: string }) {
                       functionName: "disputeBond",
                       args: [s.token],
                     })) as bigint;
-                    if (bond > 0n)
-                      await tx.write(s.token, erc20, "approve", [
-                        config.contracts.disputeVault!,
-                        bond,
-                      ]);
-                    const amount = BigInt(String(form.get("amount"))),
-                      evidenceHash = keccak256(
-                        toHex(String(form.get("evidence"))),
-                      ),
+                    const approveBond = async () => {
+                      if (bond > 0n)
+                        await tx.write(s.token, erc20, "approve", [
+                          config.contracts.disputeVault!,
+                          bond,
+                        ]);
+                    };
+                    const amount =
+                      s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                        ? parseUnits(String(form.get("amount")), 6)
+                        : BigInt(String(form.get("amount")));
+                    if (amount <= 0n || amount > BigInt(s.amount))
+                      throw Error(
+                        "Enter a refund amount within the held payment",
+                      );
+                    const savedEvidence = await request<{ evidenceHash: Hex }>(
+                      "/disputes/" + record + "/evidence",
+                      {
+                        method: "POST",
+                        body: JSON.stringify({
+                          content: String(form.get("evidence")),
+                        }),
+                      },
+                      true,
+                    );
+                    const evidenceHash = savedEvidence.evidenceHash,
                       voucherId = String(form.get("receipt") || "").trim();
                     if (voucherId) {
                       const proof = await request<{
                         receipt: SignedReceipt;
                         commitment?: { settlementId: Hex; proof: Hex[] };
                       }>("/receipts/" + h32(voucherId), undefined, true);
-                      if (proof.commitment?.settlementId !== record)
+                      if (
+                        proof.commitment?.settlementId.toLowerCase() !==
+                        record.toLowerCase()
+                      )
                         throw Error(
                           "Receipt belongs to a different settlement",
                         );
                       const r = proof.receipt;
+                      await approveBond();
                       await tx.write(
                         config.contracts.disputeVault!,
                         vaultAbi,
@@ -1117,6 +1392,7 @@ function DisputePanel({ record }: { record: string }) {
                         throw Error(
                           "Supply a receipt or confirm the missing-receipt claim",
                         );
+                      await approveBond();
                       await tx.write(
                         config.contracts.disputeVault!,
                         vaultAbi,
@@ -1128,28 +1404,64 @@ function DisputePanel({ record }: { record: string }) {
                 }}
               >
                 <Field
-                  label="Disputed amount (token base units)"
+                  label={
+                    s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                      ? "Refund requested (USDC)"
+                      : "Refund requested (token base units)"
+                  }
                   name="amount"
                 />
-                <Field
-                  label="Receipt voucher hash (optional)"
-                  name="receipt"
-                  required={false}
+                <label className="live-field">
+                  <span>Payment receipt</span>
+                  <select name="receipt">
+                    <option value="">
+                      Select a receipt, or report a missing receipt
+                    </option>
+                    {receiptOptions.value?.items
+                      .filter(
+                        (item) =>
+                          item.commitment?.settlementId.toLowerCase() ===
+                          record.toLowerCase(),
+                      )
+                      .map((item) => (
+                        <option
+                          key={item.receipt.receipt.voucherHash}
+                          value={item.receipt.receipt.voucherHash}
+                        >
+                          API call #{item.receipt.receipt.nonce} ·{" "}
+                          {new Date(
+                            Number(item.receipt.receipt.timestamp) * 1000,
+                          ).toLocaleString()}
+                        </option>
+                      ))}
+                  </select>
+                  <span className="field-help">
+                    Receipts are loaded from your private records. If a receipt
+                    is not listed, open its wallet to check additional records;
+                    this view includes the first 100.
+                  </span>
+                </label>
+                <ReadStatus
+                  loading={receiptOptions.loading}
+                  error={receiptOptions.error}
                 />
                 <label className="live-check">
                   <input type="checkbox" name="missing" />I am making a
                   missing-receipt claim if no receipt is supplied.
                 </label>
                 <label className="live-field">
-                  <span>Evidence text (only its hash is submitted here)</span>
+                  <span>
+                    What went wrong? (shared privately with the provider and
+                    arbiter)
+                  </span>
                   <textarea name="evidence" required />
                 </label>
                 <p className="muted small">
                   The configured dispute bond is approved before opening. Only
                   the current agent wallet owner can open this claim.
                 </p>
-                <Button disabled={tx.busy || !address}>
-                  Approve bond and open dispute
+                <Button disabled={tx.busy || !address || !signedIn}>
+                  Approve bond and request refund
                 </Button>
               </form>
             )}
@@ -1247,7 +1559,11 @@ function DisputePanel({ record }: { record: string }) {
                   onSubmit={(event) => {
                     const form = data(event);
                     void tx.execute(async () => {
-                      const refund = BigInt(String(form.get("refund"))),
+                      const refund =
+                          s.token.toLowerCase() ===
+                          siteConfig.usdc.toLowerCase()
+                            ? parseUnits(String(form.get("refund")), 6)
+                            : BigInt(String(form.get("refund"))),
                         amount = BigInt(d.amount);
                       if (refund < 0n || refund > amount)
                         throw Error("Refund exceeds the disputed amount");
@@ -1266,9 +1582,17 @@ function DisputePanel({ record }: { record: string }) {
                   }}
                 >
                   <Field
-                    label="Refund to agent (token base units)"
+                    label={
+                      s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                        ? "Refund to agent (USDC)"
+                        : "Refund to agent (token base units)"
+                    }
                     name="refund"
-                    defaultValue={d.amount}
+                    defaultValue={
+                      s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
+                        ? formatUnits(BigInt(d.amount), 6)
+                        : d.amount
+                    }
                   />
                   <label className="live-check">
                     <input name="returnBond" type="checkbox" defaultChecked />
@@ -1315,8 +1639,7 @@ export function LiveWorkspace({
   record?: string;
 }) {
   const { config } = useApi();
-  const health = useRead<{ database: string; rpc: string }>("/health"),
-    events = useRead<{ items: LogRecord[] }>(
+  const events = useRead<{ items: LogRecord[] }>(
       config?.contracts.disputeVault &&
         (id === "disputes" || id === "provider-settlements")
         ? id === "disputes"
@@ -1334,26 +1657,17 @@ export function LiveWorkspace({
   return (
     <div className="live-workspace">
       <ApiConnection />
-      {id === "overview" && (
-        <>
-          <div className="grid-three app-stats">
-            <Stat label="RPC connection" hint="Live API health">
-              {health.value?.rpc || "Checking"}
-            </Stat>
-            <Stat label="Database" hint="Live API health">
-              {health.value?.database || "Checking"}
-            </Stat>
-            <Stat label="Network" hint="Configured chain">
-              {config?.chainId || "—"}
-            </Stat>
-          </div>
-          <WalletList />
-        </>
-      )}
+      {id === "overview" && <WalletHub home />}
       {id === "wallets" && (
         <>
-          <Lookup label="Agent wallet address" href={routes.wallet} />
-          <WalletList />
+          <WalletHub />
+          <details className="workspace-disclosure">
+            <summary>Already have a wallet address?</summary>
+            <p className="muted small">
+              Open an existing payment wallet, including one transferred to you.
+            </p>
+            <Lookup label="Payment wallet address" href={routes.wallet} />
+          </details>
         </>
       )}
       {id === "wallet-new" && <CreateWallet />}
@@ -1364,13 +1678,46 @@ export function LiveWorkspace({
       {id === "provider-settlements" && (
         <>
           <ReceiptRecords provider />
-          <Lookup label="Settlement ID" href={routes.dispute} />
-          <EventTable logs={events.value?.items || []} state={events} />
+          <details className="workspace-disclosure">
+            <summary>Look up another payment</summary>
+            <Lookup
+              label="Payment reference (settlement ID)"
+              href={routes.dispute}
+            />
+          </details>
+          <details className="workspace-disclosure">
+            <summary>Explore recent network activity</summary>
+            <p className="muted small">
+              Public events across the protocol in the recent block window. This
+              is not limited to your account.
+            </p>
+            <EventTable logs={events.value?.items || []} state={events} />
+          </details>
         </>
       )}
       {id === "disputes" && (
         <>
-          <Lookup label="Settlement or dispute ID" href={routes.dispute} />
+          <Card className="refund-intro">
+            <h2>Need help with a payment?</h2>
+            <p>
+              Sign in to find your payment receipt, then open its payment
+              details. Refund availability depends on the API provider’s hold
+              period and the current on-chain status.
+            </p>
+            <p className="muted small">
+              Opening a claim requires a refundable bond. The provider can
+              accept the refund, respond to it, or let the response deadline
+              expire.
+            </p>
+          </Card>
+          <ReceiptRecords />
+          <details className="workspace-disclosure">
+            <summary>Open a payment by reference</summary>
+            <Lookup
+              label="Payment reference (settlement ID)"
+              href={routes.dispute}
+            />
+          </details>
           <EventTable logs={events.value?.items || []} state={events} />
         </>
       )}

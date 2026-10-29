@@ -168,16 +168,17 @@ export function useApi() {
   return value;
 }
 export function ApiSignIn() {
+  const { address } = useAccount();
   const { signIn, signedIn, signing } = useApi(),
     [error, setError] = useState("");
   return (
     <div>
       {signedIn ? (
-        <span className="badge badge-success">Wallet session active</span>
+        <span className="badge badge-success">Private records unlocked</span>
       ) : (
         <Button
           variant="secondary"
-          disabled={signing}
+          disabled={signing || !address}
           onClick={() => {
             setError("");
             void signIn().catch((error) =>
@@ -189,9 +190,10 @@ export function ApiSignIn() {
             );
           }}
         >
-          {signing ? "Waiting for signature…" : "Sign in for private records"}
+          {signing ? "Waiting for signature…" : "Unlock my receipts"}
         </Button>
       )}
+      {!address && <p className="small muted">Connect your wallet first.</p>}
       {error && <p role="alert">{error}</p>}
     </div>
   );

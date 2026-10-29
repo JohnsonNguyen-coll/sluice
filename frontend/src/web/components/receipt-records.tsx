@@ -31,14 +31,36 @@ export function ReceiptRecords({
   const { signedIn, sessionAddress, revision, request } = useApi(),
     client = usePublicClient(),
     [offset, setOffset] = useState(0);
+  const [selectedWallet, setSelectedWallet] = useState("");
+  const ownedWallets = useQuery({
+    queryKey: ["receipt-wallet-options", sessionAddress, revision],
+    enabled: signedIn && !provider && !wallet,
+    retry: false,
+    queryFn: () =>
+      request<{ items: { wallet: string }[]; total: number }>(
+        "/wallets?owner=" + sessionAddress + "&limit=100",
+      ),
+  });
+  const resolvedWallet =
+    wallet ||
+    (ownedWallets.data?.items.some((item) => item.wallet === selectedWallet)
+      ? selectedWallet
+      : ownedWallets.data?.items[0]?.wallet);
   const records = useQuery<{ items: Entry[] }>({
-    queryKey: ["receipt-records", wallet, sessionAddress, revision, offset],
-    enabled: signedIn,
+    queryKey: [
+      "receipt-records",
+      resolvedWallet,
+      provider,
+      sessionAddress,
+      revision,
+      offset,
+    ],
+    enabled: signedIn && (provider || !!resolvedWallet),
     queryFn: () =>
       request(
         "/receipts?limit=100&offset=" +
           offset +
-          (wallet ? "&wallet=" + wallet : ""),
+          (resolvedWallet ? "&wallet=" + resolvedWallet : ""),
         undefined,
         true,
       ),
@@ -101,18 +123,54 @@ export function ReceiptRecords({
         <div className="section-heading compact">
           <div>
             <h2>
-              {provider
-                ? "Your stored settlement batches"
-                : "Signed call receipts"}
+              {provider ? "Payments & incoming funds" : "Your payment receipts"}
             </h2>
             <p className="muted small">
-              Private records from the provider’s configured Supabase store.
+              Receipts are private. Verify wallet ownership to view the records
+              available to your account.
             </p>
           </div>
           <ApiSignIn />
         </div>
+        {signedIn && !wallet && !provider && ownedWallets.data?.items.length ? (
+          <label className="live-field receipt-wallet-picker">
+            <span>Payment wallet</span>
+            <select
+              value={resolvedWallet || ""}
+              onChange={(event) => {
+                setSelectedWallet(event.target.value);
+                setOffset(0);
+              }}
+            >
+              {ownedWallets.data.items.map((item) => (
+                <option key={item.wallet} value={item.wallet}>
+                  {shortAddress(item.wallet)}
+                </option>
+              ))}
+            </select>
+            <span className="field-help">
+              Choose a wallet you created. For transferred wallets, open the
+              wallet directly. Up to 100 creation records are available here.
+            </span>
+          </label>
+        ) : null}
         {!signedIn ? (
-          <p>Sign in to view receipts for your account.</p>
+          <p>
+            Sign a free login message to view your receipts. This does not move
+            funds or authorize a payment.
+          </p>
+        ) : !provider && !wallet && ownedWallets.isLoading ? (
+          <p role="status">Finding your payment wallets…</p>
+        ) : ownedWallets.error ? (
+          <Callout title="Couldn’t load your wallets" tone="warn">
+            {ownedWallets.error.message}
+          </Callout>
+        ) : !provider && !resolvedWallet ? (
+          <p className="receipt-empty">
+            No payment wallets found for this account.{" "}
+            <Link href="/app/wallets">Open your wallets</Link> to create one or
+            look up an existing address.
+          </p>
         ) : records.isLoading ? (
           <p role="status">Loading signed receipts…</p>
         ) : records.error ? (
@@ -125,11 +183,11 @@ export function ReceiptRecords({
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Voucher</th>
-                    <th>Call nonce</th>
-                    <th>HTTP status</th>
+                    <th>Payment</th>
+                    <th>Amount</th>
+                    <th>API response</th>
                     <th>Receipt</th>
-                    <th>Settlement</th>
+                    <th>Payment details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,11 +195,30 @@ export function ReceiptRecords({
                     <tr key={item.receipt.receipt.voucherHash}>
                       <td>
                         <code title={item.receipt.receipt.voucherHash}>
-                          {shortAddress(item.receipt.receipt.voucherHash)}
+                          {new Date(
+                            Number(item.receipt.receipt.timestamp) * 1000,
+                          ).toLocaleString()}
                         </code>
                       </td>
-                      <td>{item.receipt.receipt.nonce}</td>
-                      <td>{item.receipt.receipt.status}</td>
+                      <td>
+                        {item.receipt.receipt.token.toLowerCase() ===
+                        siteConfig.usdc.toLowerCase()
+                          ? formatUnits(
+                              BigInt(item.receipt.receipt.amount),
+                              6,
+                            ) + " USDC"
+                          : item.receipt.receipt.amount + " token units"}
+                      </td>
+                      <td>
+                        {item.receipt.receipt.status >= 200 &&
+                        item.receipt.receipt.status < 300
+                          ? "Successful"
+                          : "Returned an error"}
+                        <span className="muted small">
+                          {" "}
+                          · {item.receipt.receipt.status}
+                        </span>
+                      </td>
                       <td>
                         {item.verified ? "Signature verified" : "Unverified"}
                       </td>
@@ -150,10 +227,10 @@ export function ReceiptRecords({
                           <Link
                             href={routes.dispute(item.commitment.settlementId)}
                           >
-                            {shortAddress(item.commitment.settlementId)}
+                            View payment →
                           </Link>
                         ) : (
-                          "Awaiting settlement"
+                          "Provider hasn’t collected yet"
                         )}
                       </td>
                     </tr>
@@ -162,7 +239,10 @@ export function ReceiptRecords({
               </table>
             </div>
             {!records.data?.items.length && (
-              <p>No signed receipts found for this account.</p>
+              <p className="receipt-empty">
+                No payment receipts yet. They appear after your connected agent
+                makes a paid API call through a provider using Sluice.
+              </p>
             )}
             <div className="live-actions">
               <Button
@@ -248,12 +328,44 @@ export function ReceiptRecords({
 
 export function EvidenceRecords({ id }: { id: string }) {
   const { signedIn, sessionAddress, revision, request } = useApi();
-  const evidence = useQuery<{ items: { id: string; author: string; content: string; created_at: string }[] }>({
-    queryKey: ['private-evidence', id, sessionAddress, revision],
+  const evidence = useQuery<{
+    items: {
+      id: string;
+      author: string;
+      content: string;
+      created_at: string;
+    }[];
+  }>({
+    queryKey: ["private-evidence", id, sessionAddress, revision],
     enabled: signedIn,
-    queryFn: () => request('/disputes/' + id + '/evidence', undefined, true),
+    queryFn: () => request("/disputes/" + id + "/evidence", undefined, true),
     retry: false,
   });
   if (!signedIn) return null;
-  return <Card><h2>Private evidence</h2>{evidence.isLoading && <p role="status">Loading evidence…</p>}{evidence.error && <Callout title="Evidence access" tone="warn">{evidence.error.message}</Callout>}{evidence.data?.items.map(item => <section key={item.id}><p className="small muted">{shortAddress(item.author)} · {new Date(item.created_at).toLocaleString()}</p><code>{item.id}</code><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.content}</pre></section>)}{evidence.data?.items.length === 0 && <p>No private evidence has been uploaded.</p>}</Card>;
+  return (
+    <Card>
+      <h2>Private evidence</h2>
+      {evidence.isLoading && <p role="status">Loading evidence…</p>}
+      {evidence.error && (
+        <Callout title="Evidence access" tone="warn">
+          {evidence.error.message}
+        </Callout>
+      )}
+      {evidence.data?.items.map((item) => (
+        <section key={item.id}>
+          <p className="small muted">
+            {shortAddress(item.author)} ·{" "}
+            {new Date(item.created_at).toLocaleString()}
+          </p>
+          <code>{item.id}</code>
+          <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+            {item.content}
+          </pre>
+        </section>
+      ))}
+      {evidence.data?.items.length === 0 && (
+        <p>No private evidence has been uploaded.</p>
+      )}
+    </Card>
+  );
 }

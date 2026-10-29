@@ -1,10 +1,22 @@
 # Website and live workspace
 
+## App usability update (2026-10-29)
+
+The original top-navigation labels, routes and visual style are retained at the user’s request. The app content now offers a connection/setup guide, live wallet balance cards with page-scoped totals, a simplified creation form, task-specific wallet tabs and readable USDC receipts/budgets. Only verified current-owner wallets contribute to totals; failed reads are shown as unavailable. Wallet creation records are not a complete ownership-transfer index, so address lookup remains available.
+
+Funding, withdrawal, provider allowances, daily settlement limits, pause/key changes and refund actions use contract simulation and wallet confirmation. No additional transactions are sent automatically by this UI update. Private receipts use SIWE and wallet-scoped API reads; the refund form selects a stored receipt and saves its explanation privately. Planned organization/approval routes remain clearly unavailable. There is no hosted AI agent or invented activity data.
+
+## Wallet connection (RainbowKit)
+
+The workspace uses RainbowKit 2.2.11 with the existing Wagmi/Query providers, Arc Testnet chain and public-RPC fallback order. Connect opens RainbowKit’s wallet selector; a connected account opens its account modal, and an unsupported chain opens its chain-switch modal. Modal colors follow the app’s Light/Dark/System setting. This connection does not replace the separate SIWE login required for private receipts.
+
+Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in ignored frontend/.env.local to a real Reown project ID, then rebuild/restart the frontend. QR/mobile connectors are included only for a configured 32-character hexadecimal ID. Without an ID, browser extensions remain supported through injected-wallet discovery and Rabby. No demo project ID, account or signing key is bundled. Validation: lint/typecheck, production build and all 54 route checks passed; the actual RainbowKit selector was opened in the app. The no-project-ID browser-wallet mode was verified. QR/mobile and wallet signing still require the user’s real project ID/wallet. Build emits upstream optional MetaMask React Native storage and WalletConnect pino-pretty warnings; they are not build failures.
+
 ## Scope and checkpoint
 
 Updated 2026-10-29. The Next.js application retains the landing, routes, theme, Dark Veil motion and design system. App routes now connect to the Bun API and injected-wallet clients for real reads and simulated/confirmed transactions. Production/a11y certification and an independent contract audit are not claimed.
 
-The coordinated V1/V2/V3 release is in the canonical manifest, including historical factories. Dashboard features include wallet creation/funding/budgets, identity/provider registration, receipt lists, held/releasable batch views, private evidence and dispute/deadline actions. SIWE tokens stay in memory and are revoked on account/network disconnect. Service-role/signing keys stay server-side. Organization/approval/subscription capabilities remain planned. The prior dashboard stays available through “Open existing dashboard” on /app.
+The coordinated V1/V2/V3 release is in the canonical manifest, including historical factories. Dashboard features include wallet creation/funding/budgets, identity/provider registration, receipt lists, held/releasable batch views, private evidence and dispute/deadline actions. SIWE tokens stay in memory and are revoked on account/network disconnect. Service-role/signing keys stay server-side. Organization/approval/subscription capabilities remain planned. The overview focuses on agent wallets; diagnostic statistic cards and the legacy-dashboard switch have been removed.
 
 See ../../docs/PHASE3_DELIVERY.md for tests, real transaction hashes and the two pending three-day testnet deadlines. Public reference pages explain actual behavior; they use React content rather than an MDX search pipeline. The historical design notes below describe the earlier foundation checkpoint.
 
