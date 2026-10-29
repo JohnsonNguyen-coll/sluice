@@ -9,7 +9,7 @@ const decode=value=>value.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/
 function matchesRoute(path){return manifest.some(route=>new RegExp('^'+route.path.replace(/\[\w+\]/g,'[^/]+')+'/?$').test(path));}
 for(let start=0;start<manifest.length;start+=4){
  await Promise.all(manifest.slice(start,start+4).map(async route=>{
- const path=route.path.replace('[address]',fixtureAddress).replace('[teamId]',fixtureId).replace('[id]',fixtureId);
+ const path=route.path.replace('[provider]',fixtureAddress).replace('[slug]','example-api').replace('[address]',fixtureAddress).replace('[teamId]',fixtureId).replace('[id]',fixtureId);
  try{
  const response=await fetch(new URL(path,base));assert.equal(response.status,200,path+' returned '+response.status);
  const html=await response.text();const title=decode(html.match(/<title>([\s\S]*?)<\/title>/)?.[1]||'');

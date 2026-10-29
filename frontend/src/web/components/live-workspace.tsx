@@ -2,7 +2,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import {
   decodeEventLog,
@@ -28,6 +28,8 @@ import {
 import { useApi, ApiConnection, ApiSignIn } from "./api-session";
 import { ReceiptRecords, EvidenceRecords } from "./receipt-records";
 import { WalletHub } from "./wallet-hub";
+import { AgentProfile } from "./agent-profile";
+import { ProviderListings } from "./api-directory";
 import { WalletControl } from "./wallet-control";
 import {
   Button,
@@ -368,7 +370,11 @@ function WalletDetail({
     client = usePublicClient(),
     { revision, config } = useApi(),
     tx = useTransaction();
-  const [budgetProvider, setBudgetProvider] = useState("");
+  const searchParams = useSearchParams();
+  const selectedProvider = searchParams.get("provider") || "";
+  const [budgetProvider, setBudgetProvider] = useState(
+    isAddress(selectedProvider) ? selectedProvider : "",
+  );
   const budget = useRead<{
     budget: [string, string];
     settled: string;
@@ -442,6 +448,9 @@ function WalletDetail({
               </span>
             </Stat>
           </div>
+          {(section === "wallet" || section === "wallet-settings") && (
+            <AgentProfile wallet={w.address} isOwner={isOwner} />
+          )}
           {section === "wallet-settings" && (
             <Card>
               <h2>Wallet owner</h2>
@@ -742,7 +751,11 @@ function WalletDetail({
                             </option>
                           </select>
                         </label>
-                        <Field label="Provider address" name="provider" />
+                        <Field
+                          label="Provider address"
+                          name="provider"
+                          defaultValue={budgetProvider}
+                        />
                         <Field
                           label="Total allowance for this provider (USDC)"
                           name="total"
@@ -1674,7 +1687,12 @@ export function LiveWorkspace({
       {record && id.startsWith("wallet") && (
         <WalletDetail record={record} section={id} />
       )}{" "}
-      {id === "provider" && <ProviderPanel />}
+      {id === "provider" && (
+        <>
+          <ProviderPanel />
+          <ProviderListings />
+        </>
+      )}
       {id === "provider-settlements" && (
         <>
           <ReceiptRecords provider />

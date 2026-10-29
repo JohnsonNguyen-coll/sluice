@@ -21,7 +21,7 @@ Use `bun run backend:start` without watch mode for a process manager.
 ## Set up Supabase
 
 1. Use an existing or new Supabase project.
-2. Apply [the authentication/API migration](supabase/migrations/202610290001_backend.sql), then [provider receipts](supabase/migrations/202610290002_provider_receipts.sql) through the Supabase SQL editor or your normal migration pipeline.
+2. Apply [the authentication/API migration](supabase/migrations/202610290001_backend.sql), then [provider receipts](supabase/migrations/202610290002_provider_receipts.sql) and [API Directory / agent profiles](supabase/migrations/202610290003_directory_agents.sql) through the Supabase SQL editor or your normal migration pipeline.
 3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env. Use the server-only legacy service_role JWT key for the PostgREST authorization headers.
 4. Arc Testnet public RPC failover works by default. Set AUTH_ORIGIN to the exact frontend origin (localhost and 127.0.0.1 are different).
 5. Set optional registry/vault addresses only after verifying their deployments match the current contracts. Historical metadata is not selected automatically.
@@ -139,3 +139,13 @@ bun run backend/scripts/generate-abis.ts
 Tests use real PostgreSQL semantics through PGlite for migrations, grants, nonce consumption and voucher-channel transactions, plus deterministic mock RPC responses for contract reads and V1/V2 EIP-712 validation. No real chain transactions are sent.
 
 The private workspace packages @sluice/sdk and @sluice/middleware are included in bun install and checked by bun run protocol:check. Examples run from this repository; they are not published npm packages. Local and real-testnet end-to-end scripts/transaction reports are separate from deterministic unit tests.
+
+## API Directory and private agent profiles
+
+- GET /directory: published listings, name/category filters and pagination (maximum 20 per page). Provider registration is rechecked against the configured chain; failures remain explicitly unverified.
+- GET /directory/:provider/:slug: one published listing. Prices are provider declarations, not live quote verification. Endpoint URLs are stored, never fetched by the backend.
+- GET /directory/mine: signed-in provider’s drafts and listings.
+- POST /directory: create/update a listing bound to the SIWE actor; publishing requires active provider registration. Prices accept USDC with up to six decimals. HTTPS endpoint/docs URLs reject embedded credentials.
+- GET/POST /wallets/:wallet/profile: current-owner-only private name/purpose. A transferred wallet does not reveal the prior owner’s saved profile. Recent signed receipt activity is reported separately from runtime status, which remains unknown.
+
+The Directory supports discovery and links into the real budget form. It does not host agents/APIs, reserve funds, verify service quality or guarantee the listed price. Domain proof verification runs on demand in the browser using the SDK and requires provider CORS support. Registry counters are provider-wide, not endpoint ratings. No sample listings are seeded.

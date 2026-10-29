@@ -5,7 +5,7 @@ import { routeManifest, routeHref, type RouteId } from '../lib/routes';
 import { ArrowUpRight, BookOpen, Wallet, LayoutDashboard, Receipt, ShieldCheck, Building2, ListFilter } from 'lucide-react';
 const appItems: { id: RouteId; label: string; icon: typeof Wallet }[] = [
  { id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'wallets', label: 'Agent wallets', icon: Wallet },
- { id: 'provider', label: 'Provider', icon: Receipt }, { id: 'disputes', label: 'Disputes', icon: ShieldCheck },
+ { id: 'explore', label: 'Explore APIs', icon: BookOpen }, { id: 'provider', label: 'Provider', icon: Receipt }, { id: 'disputes', label: 'Disputes', icon: ShieldCheck },
  { id: 'approvals', label: 'Approvals', icon: ShieldCheck }, { id: 'org', label: 'Organization', icon: Building2 },
  { id: 'audit', label: 'Audit activity', icon: ListFilter },
 ];

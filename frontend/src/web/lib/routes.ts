@@ -376,6 +376,20 @@ export const routeManifest = [
     "path": "/app/profile/[id]",
     "title": "Public profile",
     "description": "Inspect an agent or provider identity and verifiable reputation data."
+  },
+  {
+    "area": "app",
+    "id": "explore",
+    "path": "/app/explore",
+    "title": "API Directory",
+    "description": "Find provider-published APIs, check payment terms and connect a payment wallet."
+  },
+  {
+    "area": "app",
+    "id": "api-listing",
+    "path": "/app/explore/[provider]/[slug]",
+    "title": "API details",
+    "description": "Review a provider-published API and set its spending allowance."
   }
 ] as const;
 export type RouteId = typeof routeManifest[number]['id'];

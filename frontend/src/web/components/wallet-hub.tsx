@@ -12,7 +12,8 @@ import {
   Plus,
   ArrowUpRight,
 } from "lucide-react";
-import { useApi } from "./api-session";
+import { useApi, ApiSignIn } from "./api-session";
+import type { AgentDetailsResponse } from "./agent-profile";
 import { WalletControl } from "./wallet-control";
 import { Button, ButtonLink, Card, Callout } from "./ui";
 import { siteConfig, shortAddress } from "../lib/site-config";
@@ -74,10 +75,10 @@ function SetupSteps() {
 export function WalletHub({ home = false }: { home?: boolean }) {
   const { address } = useAccount(),
     client = usePublicClient(),
-    { request, revision } = useApi();
+    { request, revision, signedIn, sessionAddress } = useApi();
   const [offset, setOffset] = useState(0);
   const page = useQuery({
-    queryKey: ["wallet-hub", address, offset, revision],
+    queryKey: ["wallet-hub", address, offset, revision, sessionAddress],
     enabled: !!address && !!client,
     retry: false,
     queryFn: async () => {
@@ -98,11 +99,21 @@ export function WalletHub({ home = false }: { home?: boolean }) {
                 args: [item.wallet],
               });
             } catch {}
-            return { info, balance, address: item.wallet, error: false };
+            let agent: AgentDetailsResponse | null = null;
+            if (signedIn && info.owner.toLowerCase() === address?.toLowerCase())
+              try {
+                agent = await request<AgentDetailsResponse>(
+                  "/wallets/" + item.wallet + "/profile",
+                  undefined,
+                  true,
+                );
+              } catch {}
+            return { info, balance, agent, address: item.wallet, error: false };
           } catch {
             return {
               info: null,
               balance: null,
+              agent: null,
               address: item.wallet,
               error: true,
             };
@@ -188,6 +199,7 @@ export function WalletHub({ home = false }: { home?: boolean }) {
             <p>Separate balances for the agents you connect.</p>
           </div>
           <div className="live-actions">
+            <ApiSignIn />
             <Button
               variant="ghost"
               disabled={page.isFetching}
@@ -257,8 +269,12 @@ export function WalletHub({ home = false }: { home?: boolean }) {
                   href={routes.wallet(row.address)}
                   className="wallet-card-title"
                 >
-                  Wallet {shortAddress(row.address)}
+                  {row.agent?.profile?.name ||
+                    "Wallet " + shortAddress(row.address)}
                 </Link>
+                {row.agent?.profile?.purpose && (
+                  <p className="muted small">{row.agent.profile.purpose}</p>
+                )}
                 <p className="wallet-card-balance">
                   {row.balance === null ? "—" : formatUnits(row.balance, 6)}{" "}
                   <span>USDC</span>

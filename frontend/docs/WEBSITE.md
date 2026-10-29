@@ -12,6 +12,12 @@ The workspace uses RainbowKit 2.2.11 with the existing Wagmi/Query providers, Ar
 
 Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in ignored frontend/.env.local to a real Reown project ID, then rebuild/restart the frontend. QR/mobile connectors are included only for a configured 32-character hexadecimal ID. Without an ID, browser extensions remain supported through injected-wallet discovery and Rabby. No demo project ID, account or signing key is bundled. Validation: lint/typecheck, production build and all 54 route checks passed; the actual RainbowKit selector was opened in the app. The no-project-ID browser-wallet mode was verified. QR/mobile and wallet signing still require the user’s real project ID/wallet. Build emits upstream optional MetaMask React Native storage and WalletConnect pino-pretty warnings; they are not build failures.
 
+## API discovery and agent labels
+
+Explore APIs adds /app/explore and /app/explore/:provider/:slug. Providers save drafts or publish real endpoint/USDC price metadata via their SIWE session; active registration is checked on-chain. Directory cards do not imply live price, quality or domain verification. Detail pages show registry counters, allow on-demand domain proof checking, copy SDK configuration and link a selected wallet to its real provider-allowance form.
+
+Current wallet owners can privately save an agent name/purpose in Supabase. Wallet cards use those names after unlocking the wallet session. Recent provider-signed receipts are shown independently of agent runtime: there is no heartbeat or hosted-agent claim. Migrated database tables use RLS and service-role-only grants; the backend authorizes every profile read/write against current on-chain ownership. No fake provider, agent runtime or activity is seeded. Validation: 38 backend tests (261 assertions), frontend lint/typecheck, production build and all 56 route checks pass. The real Supabase directory returns an empty list before any provider publishes; an authenticated current-owner profile read returns HTTP 200 and finds the existing testnet signed payment receipt while runtime status remains unknown. No production listing/profile was seeded by the tests.
+
 ## Scope and checkpoint
 
 Updated 2026-10-29. The Next.js application retains the landing, routes, theme, Dark Veil motion and design system. App routes now connect to the Bun API and injected-wallet clients for real reads and simulated/confirmed transactions. Production/a11y certification and an independent contract audit are not claimed.

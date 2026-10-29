@@ -6,10 +6,13 @@ import type {Gateway} from './chain';
 import type {Store} from './store';
 import {apiError,fail} from './errors';
 import {verifyReceipt,receiptHash,computeReputation,type ReputationInput} from '@sluice/sdk';
+import {SupabaseCatalogStore,shortText,httpsUrl,type CatalogStore,type ApiListing} from './catalog';
+import deployment from '../../contract/deployments/arc-testnet.json';
+import {parseUnits} from 'viem';
 import {address,hex,uint,page,body} from './validation';
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,(_,v)=>typeof v==='bigint'?v.toString():v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>number=Date.now){
+export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>number=Date.now,catalog:CatalogStore=new SupabaseCatalogStore(config)){
  const limits=new Map<string,{count:number;until:number}>();
  function rate(key:string,max:number){const now=clock();for(const[k,v]of limits)if(v.until<=now)limits.delete(k);if(limits.size>=10000&&!limits.has(key))fail(429,'RATE_LIMITED','Retry later');let r=limits.get(key);if(!r){r={count:0,until:now+60000};limits.set(key,r);}if(++r.count>max)fail(429,'RATE_LIMITED','Retry after one minute');}
  async function actor(req:Request){const token=req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];if(!token)fail(401,'UNAUTHORIZED','A wallet session bearer token is required');const value=await store.session(digest(token));if(!value)fail(401,'UNAUTHORIZED','Session expired or invalid');return address(value);}
@@ -39,6 +42,36 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
   }
   if(path==='/auth/me'&&req.method==='GET')return json({address:await actor(req)});
   if(path==='/auth/logout'&&req.method==='POST'){await actor(req);await store.logout(digest(req.headers.get('authorization')!.slice(7)));return json({loggedOut:true});}
+  async function enrichListing(item:ApiListing){
+   try {const status=await chain.provider(address(item.provider)) as {entry:{active:boolean;disputeWindow:number;metadataHash:string}};
+    return {...item,token:deployment.v1.contracts.AgentWalletFactory.constructorArgs.usdc,decimals:6,providerStatus:status.entry.active?'active':'inactive',disputeWindow:Number(status.entry.disputeWindow),registryMetadataHash:status.entry.metadataHash,priceSource:'provider-declared; the live API quote is authoritative'};
+   }catch{return {...item,token:deployment.v1.contracts.AgentWalletFactory.constructorArgs.usdc,decimals:6,providerStatus:'unavailable',disputeWindow:null,priceSource:'provider-declared; the live API quote is authoritative'};}
+  }
+  if(path==='/directory'&&req.method==='GET'){
+   const {limit:requested,offset}=page(url),limit=Math.min(requested,20),q=(url.searchParams.get('q')||'').trim(),category=url.searchParams.get('category')||'';
+   if(q.length>80||/[^\p{L}\p{N} .'-]/u.test(q))fail(400,'INVALID_SEARCH','Search uses letters, numbers, spaces, dots, apostrophes and hyphens, up to 80 characters');
+   if(category&&!['Data','AI','Search','Tools','Other'].includes(category))fail(400,'INVALID_CATEGORY','Unknown category');
+   const items=await catalog.list(config.chainId,limit,offset,{q,category});return json({items:await Promise.all(items.map(enrichListing)),limit,offset,hasMore:items.length===limit});
+  }
+  if(path==='/directory/mine'&&req.method==='GET'){const who=await actor(req),{limit:requested,offset}=page(url),limit=Math.min(requested,20);const items=await catalog.list(config.chainId,limit,offset,{provider:who});return json({items:await Promise.all(items.map(enrichListing)),limit,offset,hasMore:items.length===limit});}
+  if(path==='/directory'&&req.method==='POST'){
+   const who=await actor(req),input=await body(req),slug=shortText(input.slug,'Listing URL name',48);if(!/^[a-z0-9][a-z0-9-]{0,47}$/.test(slug))fail(400,'INVALID_SLUG','Use lowercase letters, numbers and hyphens for the listing URL name');
+   if(typeof input.published!=='boolean')fail(400,'INVALID_INPUT','Choose whether to publish this listing');
+   if(input.published){const registered=await chain.provider(who) as {entry:{active:boolean}};if(!registered.entry.active)fail(403,'PROVIDER_INACTIVE','Register and activate your provider before publishing');}
+   const category=shortText(input.category,'Category',20);if(!['Data','AI','Search','Tools','Other'].includes(category))fail(400,'INVALID_CATEGORY','Unknown category');
+   if(input.method!=='GET'&&input.method!=='POST')fail(400,'INVALID_METHOD','Only GET and POST APIs are supported');
+   const price=shortText(input.priceUsdc,'Price in USDC',20);if(!/^\d{1,9}(\.\d{1,6})?$/.test(price)||parseUnits(price,6)<=0n)fail(400,'INVALID_PRICE','Price must be positive USDC with at most six decimal places');
+   const value:ApiListing={chain_id:config.chainId,provider:who.toLowerCase(),slug,name:shortText(input.name,'API name',80),description:shortText(input.description,'Description',1000),category,endpoint:httpsUrl(input.endpoint,'API endpoint'),method:input.method,docs_url:httpsUrl(input.docsUrl||'','Documentation URL',true),price:parseUnits(price,6).toString(),published:input.published,updated_at:new Date(clock()).toISOString()};await catalog.saveListing(value);return json({listing:await enrichListing(value)},201);
+  }
+  const listingPath=path.match(/^\/directory\/(0x[a-fA-F0-9]{40})\/([a-z0-9][a-z0-9-]{0,47})$/);if(listingPath&&req.method==='GET'){const value=await catalog.listing(config.chainId,address(listingPath[1]),listingPath[2]);if(!value)fail(404,'LISTING_NOT_FOUND','This API is not published');return json({listing:await enrichListing(value)});}
+  const profilePath=path.match(/^\/wallets\/(0x[a-fA-F0-9]{40})\/profile$/);
+  if(profilePath&&(req.method==='GET'||req.method==='POST')){
+   const who=await actor(req),wallet=address(profilePath[1]),state=await chain.wallet(wallet);if(state.owner.toLowerCase()!==who.toLowerCase())fail(403,'FORBIDDEN','Only the current wallet owner can access its private agent profile');
+   if(req.method==='POST'){const input=await body(req);const value={chain_id:config.chainId,wallet:wallet.toLowerCase(),owner:who.toLowerCase(),name:shortText(input.name,'Agent name',80),purpose:shortText(input.purpose||'','Purpose',500,true),updated_at:new Date(clock()).toISOString()};await catalog.saveAgent(value);return json({profile:value});}
+   const saved=await catalog.agent(config.chainId,wallet);const records=await store.receipts(wallet.toLowerCase(),undefined,5,0);let lastPayment=null;
+   for(const record of records){const receipt=record.receipt;if(receipt.chainId===config.chainId&&receipt.wallet.toLowerCase()===wallet.toLowerCase()&&Number(receipt.receipt.timestamp)<=Math.floor(clock()/1000)+60&&await verifyReceipt(receipt)){lastPayment={timestamp:receipt.receipt.timestamp,provider:receipt.provider,amount:receipt.receipt.amount,token:receipt.receipt.token,settled:!!record.commitment};break;}}
+   return json({profile:saved?.owner.toLowerCase()===who.toLowerCase()?saved:null,lastPayment,agentRuntimeStatus:'unknown',notice:'A provider-signed receipt is payment activity, not proof that an AI agent is currently running.'});
+  }
   if(path==='/wallets'&&req.method==='GET')return json(await chain.wallets(address(url.searchParams.get('owner'),'owner'),url));
   let match=path.match(/^\/wallets\/([^/]+)(?:\/(budgets|activity))?$/);
   if(match&&req.method==='GET'){const wallet=address(match[1],'wallet');if(match[2]==='budgets')return json(await chain.budgets(wallet,address(url.searchParams.get('provider'),'provider'),url.searchParams.has('token')?address(url.searchParams.get('token'),'token'):undefined));if(match[2]==='activity')return json(await chain.activity(wallet,url));return json(await chain.wallet(wallet));}
