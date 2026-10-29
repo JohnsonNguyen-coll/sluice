@@ -1,0 +1,10 @@
+import {loadConfig} from './config';
+import {SupabaseStore} from './store';
+import {RpcGateway} from './chain';
+import {createApi} from './api';
+const config=loadConfig();
+const api=createApi(config,new SupabaseStore(config),new RpcGateway(config));
+const server=Bun.serve({hostname:config.host,port:config.port,maxRequestBodySize:32768,fetch:(req,server)=>api(req,server.requestIP(req)?.address||'unknown')});
+console.log('Sluice API: '+server.url);
+process.on('SIGINT',()=>{void server.stop();});
+process.on('SIGTERM',()=>{void server.stop();});
