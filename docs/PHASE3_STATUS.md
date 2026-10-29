@@ -1,5 +1,7 @@
 # Phase 3 implementation checkpoint
 
+Latest follow-up: [2026-10-29 review, dispute fixes and coordinated redeployment plan](PHASE3_REVIEW_2026-10-29.md). Settlement-time payout/arbiter snapshots, exclusive response/arbitration deadlines and one-time undisputed release are implemented locally. Receipt authentication and automatic secure wallet onboarding remain incomplete. V1/V2 redeployment is planned as a coordinated release, not performed.
+
 Reviewed 2026-10-28. This records source review and local validation, not a deployment or security audit.
 
 ## Current repository

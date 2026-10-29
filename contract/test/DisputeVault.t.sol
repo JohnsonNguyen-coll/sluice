@@ -530,6 +530,193 @@ contract DisputeVaultTest is Test {
         vault.arbiterTimeout(sid);
     }
 
+    // ─── Dispute hardening regressions ──────────────────────────────────────
+
+    function test_ResponseBoundary_LastSecondAllowed() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.warp(vault.getDispute(sid).responseDeadline - 1);
+        vm.prank(PROVIDER);
+        vault.respondToDispute(sid, bytes32(0));
+        assertTrue(vault.getDispute(sid).providerResponded);
+    }
+
+    function test_ResponseBoundary_ExactDeadlineRefundWins() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.warp(vault.getDispute(sid).responseDeadline);
+        vm.prank(PROVIDER);
+        vm.expectRevert(DisputeVault.ResponseDeadlineExpired.selector);
+        vault.respondToDispute(sid, bytes32(0));
+        vm.prank(ARBITER);
+        vm.expectRevert(DisputeVault.ProviderNotResponded.selector);
+        vault.arbiterDecide(sid, 0, AMOUNT, false);
+        vault.autoRefund(sid);
+        assertTrue(vault.getDispute(sid).resolved);
+    }
+
+    function test_ArbiterCannotDecideBeforeProviderResponds() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.prank(ARBITER);
+        vm.expectRevert(DisputeVault.ProviderNotResponded.selector);
+        vault.arbiterDecide(sid, 0, AMOUNT, false);
+    }
+
+    function test_ArbiterBoundary_LastSecondAllowed() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.prank(PROVIDER);
+        vault.respondToDispute(sid, bytes32(0));
+        vm.warp(vault.getDispute(sid).arbiterDeadline - 1);
+        vm.prank(ARBITER);
+        vault.arbiterDecide(sid, AMOUNT, 0, true);
+        assertTrue(vault.getDispute(sid).resolved);
+    }
+
+    function test_ArbiterBoundary_ExactDeadlineTimeoutWins() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.prank(PROVIDER);
+        vault.respondToDispute(sid, bytes32(0));
+        vm.warp(vault.getDispute(sid).arbiterDeadline);
+        vm.prank(ARBITER);
+        vm.expectRevert(DisputeVault.ArbiterDeadlineExpired.selector);
+        vault.arbiterDecide(sid, 0, AMOUNT, false);
+        vault.arbiterTimeout(sid);
+        assertTrue(vault.getDispute(sid).resolved);
+    }
+
+    function test_ProviderPreferenceChangeOnlyAffectsFutureSettlements() public {
+        bytes32 first = _receiveSettlement(AMOUNT, WINDOW);
+        address replacement = makeAddr("replacement");
+        vm.startPrank(PROVIDER);
+        provRegistry.updateArbiter(replacement);
+        provRegistry.updatePayoutAddress(replacement);
+        vm.stopPrank();
+        _openDispute(first, AMOUNT);
+        assertEq(vault.getSettlement(first).arbiter, ARBITER);
+        assertEq(vault.getSettlement(first).payoutAddress, PAYOUT);
+        vm.roll(block.number + 1);
+        bytes32 second = _receiveSettlement(AMOUNT, WINDOW);
+        assertEq(vault.getSettlement(second).arbiter, replacement);
+        assertEq(vault.getSettlement(second).payoutAddress, replacement);
+    }
+
+    function test_DefaultArbiterRotationDoesNotChangeExistingSettlement() public {
+        vm.prank(PROVIDER);
+        provRegistry.updateArbiter(address(0));
+        bytes32 first = _receiveSettlement(AMOUNT, WINDOW);
+        address replacement = makeAddr("defaultReplacement");
+        vm.prank(ADMIN);
+        vault.transferDefaultArbiter(replacement);
+        vm.prank(replacement);
+        vault.acceptDefaultArbiter();
+        _openDispute(first, AMOUNT);
+        vm.prank(PROVIDER);
+        vault.respondToDispute(first, bytes32(0));
+        vm.prank(replacement);
+        vm.expectRevert(NotArbiter.selector);
+        vault.arbiterDecide(first, 0, AMOUNT, false);
+        vm.prank(ARBITER);
+        vault.arbiterDecide(first, AMOUNT, 0, true);
+        vm.roll(block.number + 1);
+        bytes32 second = _receiveSettlement(AMOUNT, WINDOW);
+        assertEq(vault.getSettlement(second).arbiter, replacement);
+    }
+
+    function test_UndisputedReleaseMustWaitAndCannotRepeatOrRunAfterResolution() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT / 2);
+        vm.expectRevert(ReleaseWindowNotElapsed.selector);
+        vault.releaseUndisputed(sid);
+        vm.warp(vault.getSettlement(sid).releaseAfter);
+        vm.prank(makeAddr("anyone"));
+        vault.releaseUndisputed(sid);
+        assertEq(token.balanceOf(PAYOUT), AMOUNT / 2);
+        assertEq(token.balanceOf(address(vault)), AMOUNT / 2 + BOND);
+        vm.expectRevert(DisputeVault.NoUndisputedFunds.selector);
+        vault.releaseUndisputed(sid);
+        vm.prank(PROVIDER);
+        vault.acceptDispute(sid);
+        vm.expectRevert(NotInDisputedState.selector);
+        vault.releaseUndisputed(sid);
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
+
+    function test_FullDisputeHasNoUndisputedRelease() public {
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(sid, AMOUNT);
+        vm.warp(vault.getSettlement(sid).releaseAfter);
+        vm.expectRevert(DisputeVault.NoUndisputedFunds.selector);
+        vault.releaseUndisputed(sid);
+        assertEq(token.balanceOf(address(vault)), AMOUNT + BOND);
+    }
+
+    function testFuzz_PartialReleaseConservesFundsAcrossEveryResolution(uint256 disputed, uint8 path) public {
+        disputed = bound(disputed, 2, AMOUNT - 1);
+        path = uint8(bound(path, 0, 3));
+        bytes32 sid = _receiveSettlement(AMOUNT, WINDOW);
+        uint256 walletBefore = token.balanceOf(address(wallet));
+        _openDispute(sid, disputed);
+        address replacement = makeAddr("changedPayout");
+        vm.prank(PROVIDER);
+        provRegistry.updatePayoutAddress(replacement);
+        vm.warp(vault.getSettlement(sid).releaseAfter);
+        vault.releaseUndisputed(sid);
+        assertEq(token.balanceOf(address(vault)), disputed + BOND);
+        uint256 refund = disputed;
+        if (path == 0) {
+            vm.prank(PROVIDER);
+            vault.acceptDispute(sid);
+        } else if (path == 1) {
+            vm.warp(vault.getDispute(sid).responseDeadline);
+            vault.autoRefund(sid);
+        } else {
+            vm.prank(PROVIDER);
+            vault.respondToDispute(sid, bytes32(0));
+            if (path == 2) {
+                refund = disputed / 2;
+                vm.prank(ARBITER);
+                vault.arbiterDecide(sid, refund, disputed - refund, true);
+            } else {
+                vm.warp(vault.getDispute(sid).arbiterDeadline);
+                vault.arbiterTimeout(sid);
+            }
+        }
+        assertEq(token.balanceOf(address(wallet)), walletBefore + refund);
+        assertEq(token.balanceOf(PAYOUT), AMOUNT - refund);
+        assertEq(token.balanceOf(replacement), 0);
+        assertEq(token.balanceOf(OWNER), BOND);
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(vault.getSettlement(sid).undisputedReleased, AMOUNT - disputed);
+        assertTrue(vault.getDispute(sid).resolved);
+        vm.prank(PROVIDER);
+        vm.expectRevert(NotInDisputedState.selector);
+        vault.acceptDispute(sid);
+    }
+
+    function test_PartialReleaseThenProviderWinsCannotSpendAnotherSettlementsFunds() public {
+        bytes32 first = _receiveSettlement(AMOUNT, WINDOW);
+        _openDispute(first, AMOUNT / 2);
+        vm.roll(block.number + 1);
+        bytes32 second = _receiveSettlement(AMOUNT, WINDOW);
+        vm.warp(vault.getSettlement(first).releaseAfter);
+        vault.releaseUndisputed(first);
+        vm.prank(PROVIDER);
+        vault.respondToDispute(first, bytes32(0));
+        uint256 treasuryBefore = token.balanceOf(ADMIN);
+        vm.prank(ARBITER);
+        vault.arbiterDecide(first, 0, AMOUNT / 2, false);
+        assertEq(token.balanceOf(PAYOUT), AMOUNT);
+        assertEq(token.balanceOf(ADMIN), treasuryBefore + BOND);
+        assertEq(token.balanceOf(address(vault)), AMOUNT);
+        assertEq(uint8(vault.getSettlement(second).state), uint8(DisputeVault.SettlementState.HELD));
+        vault.release(second);
+        assertEq(token.balanceOf(PAYOUT), AMOUNT * 2);
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
+
     // ─── 26. Invariant test placeholder ──────────────────────────────────────
     // See AgentWalletV3.Invariant.t.sol for the full invariant test
 }

@@ -72,3 +72,15 @@ Only explicitly trusted protocol callers write counters. Volume and fee weight a
 Feedback is authorized on-chain for the settled wallet or its current wallet owner, with score 1–5 and one active entry per pair. Weight is capped at 10,000 USD E6 of paid fees per pair, preserving the existing cap. Same-owner wallet/provider pairs get zero weight, including contract providers exposing `owner()`. Once observed during settlement/feedback, this flag remains set so ownership rotation cannot erase self-dealing history. `getFeedback` also rechecks current ownership; indexers must use it rather than relying solely on the raw public storage getter or a cached flag. Common beneficial ownership behind unrelated addresses cannot be established by this check.
 
 Disputes-opened/received increment at opening; outcome hooks only change won/lost/auto-refund counters. Agent stats also expose auto-refunds. Outcomes outside 0–3 revert. Split counts as an agent partial win/provider partial loss. Arbiter timeout currently maps to agent win, distinct from the silent-provider auto-refund counter. All hooks require deployment-time trust configuration (including DisputeVault); these contracts cannot prove off-chain facts. Score computation and time decay belong in the SDK, not this registry.
+
+### D24 — Settlement terms and exclusive dispute deadlines (2026-10-29)
+
+The vault snapshots the provider payout address and effective arbiter (preferred or default) when receiving each settlement. Provider changes and two-step default-arbiter rotations affect future settlements only. A provider-selected arbiter remains a trust assumption; snapshots do not establish independence or agent acceptance of terms before settlement. Receipt/policy integration must still define that acceptance.
+
+Provider responses require `timestamp < responseDeadline`. At the exact deadline, silence refunds become available and a late response cannot preempt them. Arbitration requires a timely provider response and `timestamp < arbiterDeadline`; at that deadline only the timeout refund path remains available to resolve arbitration. Provider concession remains available because it refunds the full disputed amount.
+
+### D25 — Release undisputed principal without double payment (2026-10-29)
+
+Anyone may call `releaseUndisputed` on an unresolved disputed settlement once its original `releaseAfter` has elapsed. Only `amount - disputedAmount` is released to the snapshotted payout address; disputed principal and its bond remain in the vault. `undisputedReleased` records the amount already paid, and every resolution path subtracts it. The original amount stays unchanged for historical accounting. The partial release emits `UndisputedReleased` and does not mark the dispute resolved or the settlement terminal.
+
+Refunds continue transferring tokens to the wallet before a best-effort `receiveRefund` notification, including paused wallets and delisted tokens. These source/ABI changes require a fresh non-upgradeable vault deployment; historical instances and their ABI must remain versioned separately.

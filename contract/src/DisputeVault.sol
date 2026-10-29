@@ -27,6 +27,8 @@ import {ReputationRegistry} from "./ReputationRegistry.sol";
 ///      - Token removed from allowlist mid-dispute: refund still processes (held funds are not gated by allowlist).
 ///      - Bond is locked at dispute open; returned if agent wins fully or partially.
 ///      - Double-release and double-refund prevented by state machine.
+///      - Settlement-time arbiter and payout snapshots survive provider/admin changes.
+///      - After the hold, undisputed funds may release once while principal/bond stay locked.
 contract DisputeVault is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -59,6 +61,9 @@ contract DisputeVault is ReentrancyGuard {
         uint256 heldAt;         // timestamp of settlement
         uint256 releaseAfter;   // heldAt + disputeWindow
         SettlementState state;
+        address payoutAddress;  // snapshotted when the payment enters the vault
+        address arbiter;        // provider preference/default at settlement time
+        uint256 undisputedReleased; // paid before final resolution; never paid twice
     }
 
     struct Dispute {
@@ -87,6 +92,10 @@ contract DisputeVault is ReentrancyGuard {
     error NotProvider();
     error NotArbiter();
     error ProviderAlreadyResponded();
+    error ResponseDeadlineExpired();
+    error ProviderNotResponded();
+    error ArbiterDeadlineExpired();
+    error NoUndisputedFunds();
     error ArbiterDeadlineNotExpired();
     error SplitExceedsDisputed();
     error AlreadyResolved();
@@ -101,6 +110,7 @@ contract DisputeVault is ReentrancyGuard {
 
     event SettlementReceived(bytes32 indexed settlementId, address indexed wallet, address indexed provider, address token, uint256 amount, uint256 releaseAfter);
     event SettlementReleased(bytes32 indexed settlementId, address indexed provider, uint256 amount);
+    event UndisputedReleased(bytes32 indexed settlementId, address indexed provider, uint256 amount);
     event DisputeOpened(bytes32 indexed settlementId, address indexed wallet, uint256 amount, uint8 reasonCode, bytes32 evidenceHash);
     event ProviderResponded(bytes32 indexed settlementId, bytes32 evidenceHash);
     event DisputeAccepted(bytes32 indexed settlementId, uint256 refundAmount);
@@ -213,7 +223,10 @@ contract DisputeVault is ReentrancyGuard {
             amount:       amount_,
             heldAt:       block.timestamp,
             releaseAfter: block.timestamp + window_,
-            state:        SettlementState.HELD
+            state:        SettlementState.HELD,
+            payoutAddress: providerRegistry.payoutAddressOf(provider_),
+            arbiter:      _arbiterFor(provider_),
+            undisputedReleased: 0
         });
 
         emit SettlementReceived(settlementId, wallet_, provider_, token_, amount_, block.timestamp + window_);
@@ -231,10 +244,24 @@ contract DisputeVault is ReentrancyGuard {
 
         s.state = SettlementState.RELEASED;
 
-        address payoutAddr = providerRegistry.payoutAddressOf(s.provider);
+        address payoutAddr = s.payoutAddress;
         IERC20(s.token).safeTransfer(payoutAddr, s.amount);
 
         emit SettlementReleased(settlementId, s.provider, s.amount);
+    }
+
+    /// @notice Pay the undisputed remainder after the original hold expires.
+    /// @dev Anyone may trigger this once; the disputed principal and bond stay locked.
+    function releaseUndisputed(bytes32 settlementId) external nonReentrant {
+        Settlement storage s = settlements[settlementId];
+        Dispute storage d = disputes[settlementId];
+        _requireDisputed(s, d);
+        if (block.timestamp < s.releaseAfter) revert ReleaseWindowNotElapsed();
+        uint256 amount = s.amount - d.amount - s.undisputedReleased;
+        if (amount == 0) revert NoUndisputedFunds();
+        s.undisputedReleased += amount;
+        IERC20(s.token).safeTransfer(s.payoutAddress, amount);
+        emit UndisputedReleased(settlementId, s.provider, amount);
     }
 
     // ─── Dispute open ────────────────────────────────────────────────────────
@@ -297,7 +324,7 @@ contract DisputeVault is ReentrancyGuard {
         s.state    = SettlementState.REFUNDED;
 
         uint256 refund    = d.amount;
-        uint256 remainder = s.amount - refund;
+        uint256 remainder = s.amount - refund - s.undisputedReleased;
 
         // Refund bond back to agent
         if (d.bond > 0) IERC20(s.token).safeTransfer(d.openedBy, d.bond);
@@ -307,7 +334,7 @@ contract DisputeVault is ReentrancyGuard {
 
         // Release remainder (undisputed) to provider payout address
         if (remainder > 0) {
-            address payoutAddr = providerRegistry.payoutAddressOf(s.provider);
+            address payoutAddr = s.payoutAddress;
             IERC20(s.token).safeTransfer(payoutAddr, remainder);
         }
 
@@ -319,7 +346,7 @@ contract DisputeVault is ReentrancyGuard {
 
     // ─── Provider: respond ───────────────────────────────────────────────────
 
-    /// @notice Provider submits counter-evidence and escalates to arbiter.
+    /// @notice Provider submits counter-evidence strictly before responseDeadline.
     function respondToDispute(bytes32 settlementId, bytes32 evidenceHash) external {
         Settlement storage s = settlements[settlementId];
         Dispute    storage d = disputes[settlementId];
@@ -327,6 +354,8 @@ contract DisputeVault is ReentrancyGuard {
         if (msg.sender != s.provider) revert NotProvider();
         if (d.providerResponded) revert ProviderAlreadyResponded();
         if (d.resolved) revert AlreadyResolved();
+
+        if (block.timestamp >= d.responseDeadline) revert ResponseDeadlineExpired();
 
         d.providerResponded    = true;
         d.providerEvidenceHash = evidenceHash;
@@ -350,7 +379,7 @@ contract DisputeVault is ReentrancyGuard {
         s.state    = SettlementState.REFUNDED;
 
         uint256 refund    = d.amount;
-        uint256 remainder = s.amount - refund;
+        uint256 remainder = s.amount - refund - s.undisputedReleased;
 
         // Bond returned to agent on auto-refund (provider's fault)
         if (d.bond > 0) IERC20(s.token).safeTransfer(d.openedBy, d.bond);
@@ -358,7 +387,7 @@ contract DisputeVault is ReentrancyGuard {
         _refundToWallet(s.wallet, s.token, refund);
 
         if (remainder > 0) {
-            address payoutAddr = providerRegistry.payoutAddressOf(s.provider);
+            address payoutAddr = s.payoutAddress;
             IERC20(s.token).safeTransfer(payoutAddr, remainder);
         }
 
@@ -370,6 +399,7 @@ contract DisputeVault is ReentrancyGuard {
     // ─── Arbiter decision ────────────────────────────────────────────────────
 
     /// @notice Arbiter resolves: splits disputed amount between wallet and provider.
+    /// @dev Only the settlement's snapshotted arbiter, after response and before arbiterDeadline.
     /// @param refundToWallet   Amount returned to agent wallet (must be <= d.amount).
     /// @param releaseToProvider Amount released to provider payout (must be <= d.amount - refundToWallet).
     ///                          Remainder (if any) due to integer split: goes to provider (safe default).
@@ -386,12 +416,13 @@ contract DisputeVault is ReentrancyGuard {
         if (d.resolved) revert AlreadyResolved();
 
         // Must be the designated arbiter
-        address arbiter = _arbiterFor(s.provider);
+        address arbiter = s.arbiter;
         if (msg.sender != arbiter) revert NotArbiter();
 
-        // Provider must have responded (otherwise use autoRefund path)
-        // Actually arbiter can also step in if provider responded; arbiter can also decide unilaterally
-        // after arbiterDeadline if provider has not responded (admin safety valve). We allow both.
+        // Arbitration only exists after a timely response and before its deadline.
+        // Silence and expired arbitration have exclusive refund paths.
+        if (!d.providerResponded) revert ProviderNotResponded();
+        if (block.timestamp >= d.arbiterDeadline) revert ArbiterDeadlineExpired();
 
         // The arbiter can only split the DISPUTED amount
         if (refundToWallet + releaseToProvider > d.amount) revert SplitExceedsDisputed();
@@ -423,10 +454,10 @@ contract DisputeVault is ReentrancyGuard {
         // Remainder of disputed amount that is not refunded goes to provider
         uint256 toProvider = d.amount - refundToWallet;
         // Plus undisputed portion
-        toProvider += (s.amount - d.amount);
+        toProvider += (s.amount - d.amount - s.undisputedReleased);
 
         if (toProvider > 0) {
-            address payoutAddr = providerRegistry.payoutAddressOf(s.provider);
+            address payoutAddr = s.payoutAddress;
             IERC20(s.token).safeTransfer(payoutAddr, toProvider);
         }
 
@@ -460,7 +491,7 @@ contract DisputeVault is ReentrancyGuard {
         s.state    = SettlementState.REFUNDED;
 
         uint256 refund    = d.amount;
-        uint256 remainder = s.amount - refund;
+        uint256 remainder = s.amount - refund - s.undisputedReleased;
 
         // Bond returned on arbiter timeout (neither party's fault)
         if (d.bond > 0) IERC20(s.token).safeTransfer(d.openedBy, d.bond);
@@ -468,7 +499,7 @@ contract DisputeVault is ReentrancyGuard {
         _refundToWallet(s.wallet, s.token, refund);
 
         if (remainder > 0) {
-            address payoutAddr = providerRegistry.payoutAddressOf(s.provider);
+            address payoutAddr = s.payoutAddress;
             IERC20(s.token).safeTransfer(payoutAddr, remainder);
         }
 
