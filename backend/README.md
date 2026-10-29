@@ -23,7 +23,7 @@ Use `bun run backend:start` without watch mode for a process manager.
 1. Use an existing or new Supabase project.
 2. Apply [the migration](supabase/migrations/202610290001_backend.sql) through the Supabase SQL editor or your normal migration pipeline.
 3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env. Use the server-only legacy service_role JWT key for the PostgREST authorization headers.
-4. Configure RPC_URL for the expected chain and set AUTH_ORIGIN to the exact frontend origin (localhost and 127.0.0.1 are different).
+4. Arc Testnet public RPC failover works by default. Set AUTH_ORIGIN to the exact frontend origin (localhost and 127.0.0.1 are different).
 5. Set optional registry/vault addresses only after verifying their deployments match the current contracts. Historical metadata is not selected automatically.
 
 No Supabase credentials were available during implementation, so no remote project/schema was changed or live database connectivity verified. The migration was executed against embedded PostgreSQL in tests, including denied anon/authenticated access.
@@ -81,7 +81,22 @@ const session = await fetch('http://127.0.0.1:3001/auth/verify', {
 // Keep session.token private and send Authorization: Bearer <token>.
 ```
 
-EOA signatures work without an RPC. Contract-wallet authentication uses viem's public-client verifier and requires RPC_URL. A login signature never signs a voucher or transfer.
+EOA signatures work without an RPC. Contract-wallet authentication uses viem's public-client verifier and requires an available RPC. A login signature never signs a voucher or transfer.
+
+### Public RPC failover
+
+For CHAIN_ID=5042002, no RPC key/configuration is required. The ordered defaults from [Arc's RPC reference](https://docs.arc.io/arc/references/rpc-endpoints) are:
+
+1. https://rpc.testnet.arc.io
+2. https://rpc.blockdaemon.testnet.arc.io
+3. https://rpc.drpc.testnet.arc.io
+4. https://rpc.quicknode.testnet.arc.io
+
+Network failures, timeouts (4 seconds per RPC request), HTTP failures and transient JSON-RPC errors advance to the next endpoint. Failed endpoints cool down for 30 seconds before they can be retried. Each request attempts the eligible list once; there are no background probes or unlimited retries. The first available endpoint in order handles the request. Contract reverts and invalid parameters propagate immediately. Each endpoint's chain ID is checked before state reads and cached for 30 seconds; explicit chain-ID requests always recheck. If all endpoints fail or are cooling down, the request fails rather than returning placeholder data. Switching endpoints can expose normal differences in block height; multi-read queries retain their requested block number.
+
+RPC_URLS overrides the entire list with comma-separated HTTP URLs in priority order. RPC_URL remains a single-endpoint override for compatibility. Blank values use the defaults; other chains have no automatic endpoints. All endpoints must serve CHAIN_ID. Public endpoints may change availability or access requirements; failed ones are skipped, and no shared quota is guaranteed. Restart the backend after changing environment variables.
+
+To minimize paid RPC usage, leave RPC_URLS and RPC_URL empty and set ALCHEMY_RPC_URL to your Arc Testnet Alchemy HTTP URL. The four public endpoints are tried first; Alchemy is appended last and used only if preceding endpoints fail or are cooling down. Public endpoints become eligible again after their cooldown. ALCHEMY_RPC_URL is also kept last when an explicit list includes that same URL. No Alchemy probes run in the background.
 
 ### Voucher input
 

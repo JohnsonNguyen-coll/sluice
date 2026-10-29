@@ -58,8 +58,8 @@ test('paused wallets and stale chain nonces fail before saving',async()=>{
  lastNonce=1n;await expect(gateway.validateVoucher(data,provider.address)).rejects.toThrow('does not advance');lastNonce=0n;
 });
 test('chain mismatch, missing config, and oversized log windows fail closed',async()=>{
- chainId=1;await expect(gateway.wallet(wallet1)).rejects.toThrow('does not match');chainId=5042002;
  await expect(gateway.agent(1n)).rejects.toThrow('AGENT_REGISTRY_ADDRESS');
  await expect(gateway.activity(wallet1,new URL('http://api?fromBlock=0&toBlock=99999'))).rejects.toThrow('confirmed range');
- await expect(new RpcGateway(loadConfig({})).health()).rejects.toThrow('RPC_URL');
+ await expect(new RpcGateway(loadConfig({CHAIN_ID:'31337'})).health()).rejects.toThrow('RPC_URL');
+ chainId=1;await expect(gateway.wallet(wallet1)).rejects.toThrow('does not match');chainId=5042002;
 });

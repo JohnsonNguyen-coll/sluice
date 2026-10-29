@@ -1,6 +1,12 @@
 import { getAddress, isAddress, type Address } from 'viem';
 export type Factory={address:Address;version:1|2|3};
-export type Config={host:string;port:number;chainId:number;authOrigin:string;rpcUrl?:string;supabaseUrl?:string;supabaseKey?:string;factories:Factory[];agentRegistry?:Address;providerRegistry?:Address;reputationRegistry?:Address;disputeVault?:Address};
+export const ARC_PUBLIC_RPCS = [
+ 'https://rpc.testnet.arc.io',
+ 'https://rpc.blockdaemon.testnet.arc.io',
+ 'https://rpc.drpc.testnet.arc.io',
+ 'https://rpc.quicknode.testnet.arc.io',
+] as const;
+export type Config={host:string;port:number;chainId:number;authOrigin:string;rpcUrls:string[];supabaseUrl?:string;supabaseKey?:string;factories:Factory[];agentRegistry?:Address;providerRegistry?:Address;reputationRegistry?:Address;disputeVault?:Address};
 function addr(value:string|undefined){if(!value)return undefined;if(!isAddress(value))throw Error('Invalid configured contract address');return getAddress(value);}
 export function loadConfig(env:Record<string,string|undefined>=process.env):Config{
  const origin=new URL(env.AUTH_ORIGIN||'http://127.0.0.1:3010');
@@ -13,6 +19,11 @@ export function loadConfig(env:Record<string,string|undefined>=process.env):Conf
  ];
  if(env.FACTORY_V3_ADDRESS)factories.push({address:addr(env.FACTORY_V3_ADDRESS)!,version:3});
  if(env.SUPABASE_URL){const u=new URL(env.SUPABASE_URL);if(u.protocol!=='https:'&&!(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname)))throw Error('Supabase requires HTTPS or local development');if(u.username||u.password||u.search||u.hash||u.pathname!=='/')throw Error('Invalid SUPABASE_URL');}
- if(env.RPC_URL&&!['http:','https:'].includes(new URL(env.RPC_URL).protocol))throw Error('Invalid RPC URL');
- return {host:env.HOST||'127.0.0.1',port,chainId,authOrigin:origin.origin,rpcUrl:env.RPC_URL,supabaseUrl:env.SUPABASE_URL,supabaseKey:env.SUPABASE_SERVICE_ROLE_KEY,factories,agentRegistry:addr(env.AGENT_REGISTRY_ADDRESS),providerRegistry:addr(env.PROVIDER_REGISTRY_ADDRESS),reputationRegistry:addr(env.REPUTATION_REGISTRY_ADDRESS),disputeVault:addr(env.DISPUTE_VAULT_ADDRESS)};
+ const override=env.RPC_URLS?.trim()||env.RPC_URL?.trim();
+ const primary=override?override.split(',').map(x=>x.trim()).filter(Boolean):chainId===5042002?[...ARC_PUBLIC_RPCS]:[];
+ const alchemy=env.ALCHEMY_RPC_URL?.trim();
+ // Keep the paid endpoint last even if it also appears in an explicit list.
+ const rpcUrls=[...new Set([...primary.filter(url=>url!==alchemy),...(alchemy?[alchemy]:[])])];
+ for(const value of rpcUrls){const url=new URL(value);if(!['http:','https:'].includes(url.protocol)||url.hash)throw Error('Invalid RPC URL');}
+ return {host:env.HOST||'127.0.0.1',port,chainId,authOrigin:origin.origin,rpcUrls,supabaseUrl:env.SUPABASE_URL,supabaseKey:env.SUPABASE_SERVICE_ROLE_KEY,factories,agentRegistry:addr(env.AGENT_REGISTRY_ADDRESS),providerRegistry:addr(env.PROVIDER_REGISTRY_ADDRESS),reputationRegistry:addr(env.REPUTATION_REGISTRY_ADDRESS),disputeVault:addr(env.DISPUTE_VAULT_ADDRESS)};
 }

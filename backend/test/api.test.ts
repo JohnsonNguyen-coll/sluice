@@ -7,7 +7,7 @@ import {RpcGateway,type ValidVoucher} from '../src/chain';
 import type {Store,Challenge,VoucherRecord,EvidenceRecord} from '../src/store';
 import {SupabaseStore} from '../src/store';
 import {fail} from '../src/errors';
-import {keccak256,toHex,type Address,type Hex} from 'viem';
+import {keccak256,toHex,verifyMessage,type Address,type Hex} from 'viem';
 const account=privateKeyToAccount('0x'+'11'.repeat(32) as Hex);
 const stranger=privateKeyToAccount('0x'+'22'.repeat(32) as Hex);
 const settlement='0x'+'ab'.repeat(32);
@@ -26,6 +26,7 @@ class TestStore implements Store{
 }
 const config=loadConfig({AUTH_ORIGIN:'http://127.0.0.1:3010'});
 class TestChain extends RpcGateway{
+ async verifyLogin(address:Address,message:string,signature:Hex){return verifyMessage({address,message,signature});}
  async health(){return {chainId:config.chainId,blockNumber:100n};}
  async authorizeEvidence(_id:Hex,who:Address){if(who.toLowerCase()!==account.address.toLowerCase())fail(403,'FORBIDDEN','Not a dispute party');}
  async validateVoucher(input:Record<string,unknown>,who:Address):Promise<ValidVoucher>{

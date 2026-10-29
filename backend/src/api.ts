@@ -4,7 +4,7 @@ import {verifyMessage,keccak256,toHex} from 'viem';
 import type {Config} from './config';
 import type {Gateway} from './chain';
 import type {Store} from './store';
-import {ApiError,fail} from './errors';
+import {apiError,fail} from './errors';
 import {address,hex,uint,page,body} from './validation';
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,(_,v)=>typeof v==='bigint'?v.toString():v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -23,14 +23,14 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    const input=await body(req);const owner=address(input.address);const now=clock();const expires=new Date(now+300000);const nonce=randomBytes(16).toString('hex');
    const message=createSiweMessage({address:owner,chainId:config.chainId,domain:new URL(config.authOrigin).host,scheme:new URL(config.authOrigin).protocol.slice(0,-1),uri:config.authOrigin,version:'1',nonce,issuedAt:new Date(now),expirationTime:expires,statement:'Sign in to Sluice. This does not authorize a payment.'});
    const id=randomUUID();await store.putChallenge({id,address:owner.toLowerCase(),message,expires_at:expires.toISOString()});
-   return json({id,nonce,message,expiresAt:expires.toISOString(),walletSupport:config.rpcUrl?'EOA and RPC-supported contract wallets':'EOA only until RPC_URL is configured'},201);
+   return json({id,nonce,message,expiresAt:expires.toISOString(),walletSupport:config.rpcUrls.length?'EOA and RPC-supported contract wallets':'EOA only until RPC_URL is configured'},201);
   }
   if(path==='/auth/verify'&&req.method==='POST'){
    const input=await body(req);if(typeof input.id!=='string'||! /^[a-f0-9-]{36}$/.test(input.id))fail(400,'INVALID_INPUT','Invalid challenge ID');
    const challenge=await store.getChallenge(input.id);if(!challenge||challenge.consumed_at||Date.parse(challenge.expires_at)<=clock())fail(401,'INVALID_CHALLENGE','Challenge expired or already used');
    const signature=hex(input.signature);if(signature.length>8194)fail(400,'INVALID_SIGNATURE','Signature is too large');
    const signer=address(challenge.address);let valid=false;
-   try{valid=config.rpcUrl?await chain.verifyLogin(signer,challenge.message,signature):await verifyMessage({address:signer,message:challenge.message,signature});}catch(error){if(error instanceof ApiError&&error.status===503)throw error;}
+   try{valid=config.rpcUrls.length?await chain.verifyLogin(signer,challenge.message,signature):await verifyMessage({address:signer,message:challenge.message,signature});}catch(error){const dependency=apiError(error);if(dependency?.status===503)throw dependency;}
    if(!valid)fail(401,'INVALID_SIGNATURE','Signature does not match the challenge');
    const token=randomBytes(32).toString('hex');if(!await store.consumeChallenge(challenge.id,digest(token)))fail(401,'INVALID_CHALLENGE','Challenge expired or already used');
    return json({token,tokenType:'Bearer',expiresIn:3600,address:signer});
@@ -73,7 +73,8 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    if(req.method==='OPTIONS')response=new Response(null,{status:204,headers:{'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'600'}});
    else response=await route(req,url);
   }catch(error){
-   if(error instanceof ApiError)response=json({error:{code:error.code,message:error.message}},error.status);
+   const known=apiError(error);
+   if(known)response=json({error:{code:known.code,message:known.message}},known.status);
    else response=json({error:{code:'UPSTREAM_FAILURE',message:'The data source could not complete this request'}},502);
   }
   response.headers.set('Vary','Origin');response.headers.set('Cache-Control','no-store');response.headers.set('X-Content-Type-Options','nosniff');

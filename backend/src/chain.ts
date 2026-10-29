@@ -1,4 +1,5 @@
-import { createPublicClient, http, getAddress, parseEventLogs, recoverTypedDataAddress, hashTypedData, type Abi, type AbiEvent, type Address, type Hex } from 'viem';
+import { createPublicClient, getAddress, parseEventLogs, recoverTypedDataAddress, hashTypedData, type Abi, type AbiEvent, type Address, type Hex } from 'viem';
+import {publicRpcTransport} from './rpc';
 import type {Config} from './config';
 import {fail} from './errors';
 import {address,uint,hex,page} from './validation';
@@ -32,8 +33,8 @@ const walletAbis={1:walletV1 as Abi,2:walletV2 as Abi,3:walletV3 as Abi};
 const typesBase=[{name:'wallet',type:'address'},{name:'provider',type:'address'}];
 export class RpcGateway implements Gateway{
  private client;
- constructor(private config:Config){this.client=createPublicClient({transport:http(config.rpcUrl||'http://127.0.0.1:1',{timeout:8000,retryCount:0})});}
- private async ready(){if(!this.config.rpcUrl)fail(503,'RPC_NOT_CONFIGURED','Configure RPC_URL');if(await this.client.getChainId()!==this.config.chainId)fail(503,'CHAIN_MISMATCH','RPC chain does not match CHAIN_ID');}
+ constructor(private config:Config){this.client=createPublicClient({transport:publicRpcTransport(config.rpcUrls,config.chainId)});}
+ private async ready(){if(!this.config.rpcUrls.length)fail(503,'RPC_NOT_CONFIGURED','Configure RPC_URLS');if(await this.client.getChainId()!==this.config.chainId)fail(503,'CHAIN_MISMATCH','RPC chain does not match CHAIN_ID');}
  private configured(value:Address|undefined,name:string):Address{if(!value)fail(503,'CONTRACT_NOT_CONFIGURED','Configure '+name+' with a verified deployment');return value;}
  private async read(at:Address,abi:Abi,functionName:string,args:readonly unknown[]=[],blockNumber?:bigint):Promise<unknown>{return this.client.readContract({address:at,abi,functionName,args,blockNumber});}
  async health(){await this.ready();return {chainId:this.config.chainId,blockNumber:await this.client.getBlockNumber()};}
