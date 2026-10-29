@@ -51,7 +51,15 @@ const manifest = await Bun.file(
   resolve(CONTRACT_ROOT, "deployments/arc-testnet.json"),
 ).json();
 if (!manifest.v3) throw Error("Deploy the V3 suite before running this script");
-const at = (name: string): Address => manifest.v3.contracts[name].address;
+const existingReportFile = Bun.file(resolve(CONTRACT_ROOT, "deployments/phase3-testnet-e2e.json"));
+const existingReport: Report | undefined = await existingReportFile.exists() ? await existingReportFile.json() : undefined;
+const release = existingReport
+  ? [manifest.v3, ...(manifest.history || []).map((entry: {v3?: typeof manifest.v3}) => entry.v3)]
+      .find(entry => entry?.contracts.AgentWalletFactoryV3.address.toLowerCase() === existingReport.releaseFactory.toLowerCase())
+  : manifest.v3;
+if (!release || release.contracts.DisputeVault.negotiationVersion === 1)
+  throw Error("Legacy e2e requires its recorded legacy release; use negotiation-testnet-e2e.ts for negotiated wallets");
+const at = (name: string): Address => release.contracts[name].address;
 const key = process.env.DEPLOYER_PRIVATE_KEY as Hex;
 if (!key) throw Error("Set DEPLOYER_PRIVATE_KEY locally");
 const owner = privateKeyToAccount(key),

@@ -9,9 +9,12 @@ import agent from "./abi/AgentRegistry.json";
 import provider from "./abi/ProviderRegistry.json";
 import reputation from "./abi/ReputationRegistry.json";
 import vault from "./abi/DisputeVault.json";
+import negotiation from "./abi/NegotiationDisputeVault.json";
 export const walletAbis = { 1: v1 as Abi, 2: v2 as Abi, 3: v3 as Abi };
 export const factoryAbis = { 1: f1 as Abi, 2: f2 as Abi, 3: f3 as Abi };
 export const agentAbi = agent as Abi,
   providerAbi = provider as Abi,
   reputationAbi = reputation as Abi,
   vaultAbi = vault as Abi;
+
+export const negotiationAbi=negotiation as Abi;

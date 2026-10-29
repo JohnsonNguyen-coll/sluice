@@ -1,5 +1,7 @@
 # Phase 3 implementation status
 
+Latest dispute extension: [NEGOTIATION_DELIVERY.md](NEGOTIATION_DELIVERY.md) documents the deployed negotiation-first vault, owner consent, fixed 30-minute/24-hour rules and optional evidence assistant. The original release below remains historical; its pending cases retain their deadlines.
+
 Reviewed 2026-10-29. This is an implementation/deployment checkpoint, not an independent security audit. The user authorized completing the work after the earlier stop-and-review checkpoints.
 
 ## Implemented

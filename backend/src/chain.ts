@@ -12,9 +12,11 @@ import agentAbi from './abi/AgentRegistry.json';
 import providerAbi from './abi/ProviderRegistry.json';
 import reputationAbi from './abi/ReputationRegistry.json';
 import vaultAbi from './abi/DisputeVault.json';
+import negotiationAbi from './abi/NegotiationDisputeVault.json';
 export type WalletState={address:Address;version:1|2|3;owner:Address;agentSigner:Address;paused:boolean;factory:Address;blockNumber:bigint};
 export type ValidVoucher={id:Hex;channel:string;chain_id:number;wallet:string;provider:string;token:string;nonce:string;cumulative_amount:string;payload:unknown;signature:Hex};
 export interface Gateway{
+ arbitrationTerms(wallet:Address,provider:Address,token:Address):Promise<unknown>;
  health():Promise<unknown>;
  verifyLogin(address:Address,message:string,signature:Hex):Promise<boolean>;
  wallets(owner:Address,url:URL):Promise<unknown>;
@@ -78,14 +80,26 @@ export class RpcGateway implements Gateway{
  async agent(id:bigint){await this.ready();const at=this.configured(this.config.agentRegistry,'AGENT_REGISTRY_ADDRESS');const [entry,uri,metadataHash]=await Promise.all([this.read(at,agentAbi as Abi,'getAgent',[id]),this.read(at,agentAbi as Abi,'agentURI',[id]),this.read(at,agentAbi as Abi,'metadataHash',[id])]);return {id,entry,uri,metadataHash};}
  async provider(at:Address){await this.ready();const registry=this.configured(this.config.providerRegistry,'PROVIDER_REGISTRY_ADDRESS');if(!await this.read(registry,providerAbi as Abi,'isRegistered',[at]))fail(404,'PROVIDER_NOT_REGISTERED','Register your provider before publishing APIs');const entry=await this.read(registry,providerAbi as Abi,'getProvider',[at]);return {address:at,entry};}
  async reputation(at:Address){await this.ready();const registry=this.configured(this.config.reputationRegistry,'REPUTATION_REGISTRY_ADDRESS');const [provider,agent]=await Promise.all([this.read(registry,reputationAbi as Abi,'getProviderStats',[at]),this.read(registry,reputationAbi as Abi,'getAgentStats',[at])]);return {address:at,provider,agent,score:null,scope:'Raw on-chain counters; no invented aggregate score'};}
- async settlements(url:URL,disputes=false){if(!disputes&&url.searchParams.has('wallet')){const wallet=await this.wallet(address(url.searchParams.get('wallet')));return this.logs(wallet.address,walletAbis[wallet.version],url,'Settled');}return this.logs(this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS'),vaultAbi as Abi,url,disputes?'DisputeOpened':'SettlementReceived');}
+ async settlements(url:URL,disputes=false){if(!disputes&&url.searchParams.has('wallet')){const wallet=await this.wallet(address(url.searchParams.get('wallet')));return this.logs(wallet.address,walletAbis[wallet.version],url,'Settled');}const active=this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS'),vaults=[active,...(this.config.legacyDisputeVaults||[])];if(vaults.length===1)return this.logs(active,vaultAbi as Abi,url,disputes?'DisputeOpened':'SettlementReceived');const view=new URL(url);view.searchParams.set('limit','100');view.searchParams.set('offset','0');const groups=await Promise.all(vaults.map(async vault=>({vault,data:await this.logs(vault,vaultAbi as Abi,view,disputes?'DisputeOpened':'SettlementReceived')})));const {limit,offset}=page(url);const all=groups.flatMap(group=>group.data.items.map(item=>({...item,vault:group.vault}))).sort((a,b)=>Number(BigInt(b.blockNumber!)-BigInt(a.blockNumber!)));return {items:all.slice(offset,offset+limit),total:all.length,limit,offset,scope:'Current and legacy vaults; at most 100 events per vault in this block window'};}
+ async arbitrationTerms(wallet:Address,provider:Address,token:Address){
+  const state=await this.wallet(wallet);if(state.version!==3)return {mode:'legacy',notice:'This wallet has no negotiated arbitration.'};
+  const vault=await this.read(state.factory,[{type:'function',name:'disputeVault',stateMutability:'view',inputs:[],outputs:[{type:'address'}]}] as Abi,'disputeVault') as Address;
+  if(!this.config.negotiationVaults?.some(at=>at.toLowerCase()===vault.toLowerCase()))return {mode:'legacy',vault,notice:'Legacy dispute rules apply; they have not been changed.'};
+  const read=(name:string,args:unknown[]=[])=>this.read(vault,negotiationAbi as Abi,name,args);
+  const [hash,consent,arbiter,bond,cap]=await Promise.all([read('arbitrationTermsHash',[provider,token]),read('arbitrationConsent',[wallet,provider,token]),read('defaultArbiter'),read('disputeBond',[token]),read('maxDisputeAmount',[token])]);
+  const values=consent as [Hex,Address];return {mode:'negotiation',vault,termsHash:hash,accepted:values[0]===hash&&values[1].toLowerCase()===state.owner.toLowerCase(),arbiter,bond,cap,negotiationSeconds:1800,arbitrationSeconds:86400,timeoutOutcome:'Refund disputed principal and return bond to claimant',notice:'The current testnet protocol operator is the last-resort arbiter. This is not an independent court.'};
+ }
  async settlement(id:Hex,dispute=false){
-  await this.ready();const at=this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS');const settlement=await this.read(at,vaultAbi as Abi,'getSettlement',[id]) as {wallet:Address;provider:Address;arbiter:Address};
-  if(settlement.wallet.toLowerCase()===ZERO)fail(404,'SETTLEMENT_NOT_FOUND','Unknown settlement');
-  if(!dispute)return {id,settlement};
-  const details=await this.read(at,vaultAbi as Abi,'getDispute',[id]) as {openedAt:bigint};
-  if(details.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');
-  return {id,settlement,dispute:details};
+  await this.ready();const active=this.configured(this.config.disputeVault,'DISPUTE_VAULT_ADDRESS');
+  for(const at of [active,...(this.config.legacyDisputeVaults||[])]){
+   const settlement=await this.read(at,vaultAbi as Abi,'getSettlement',[id]) as {wallet:Address;provider:Address;arbiter:Address};if(settlement.wallet.toLowerCase()===ZERO)continue;
+   const negotiated=!!this.config.negotiationVaults?.some(v=>v.toLowerCase()===at.toLowerCase());
+   if(!dispute)return {id,vault:at,negotiated,settlement};
+   const details=await this.read(at,vaultAbi as Abi,'getDispute',[id]) as {openedAt:bigint};if(details.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');
+   let negotiation:unknown;
+   if(negotiated){const [proposal,escalated,reason]=await Promise.all([this.read(at,negotiationAbi as Abi,'proposals',[id]),this.read(at,negotiationAbi as Abi,'escalated',[id]),this.read(at,negotiationAbi as Abi,'decisionRationale',[id])]);const p=proposal as [Hex,bigint,boolean,Address,Address,Hex,bigint];negotiation={proposal:{hash:p[0],refund:p[1],returnBond:p[2],proposer:p[3],agentOwner:p[4],rationaleHash:p[5],revision:p[6]},escalated,decisionRationale:reason};}
+   return {id,vault:at,negotiated,settlement,dispute:details,negotiation};
+  }fail(404,'SETTLEMENT_NOT_FOUND','Unknown settlement');
  }
  async authorizeEvidence(id:Hex,actor:Address){const entry=await this.settlement(id,true) as {settlement:{wallet:Address;provider:Address;arbiter:Address};dispute:{openedAt:bigint}};if(entry.dispute.openedAt===0n)fail(404,'DISPUTE_NOT_FOUND','No dispute opened for this settlement');const owner=await this.read(entry.settlement.wallet,walletAbis[3],'owner') as Address;if(![owner.toLowerCase(),entry.settlement.provider.toLowerCase(),entry.settlement.arbiter.toLowerCase()].includes(actor.toLowerCase()))fail(403,'FORBIDDEN','Only the wallet owner, provider or snapshotted arbiter may access dispute evidence');}
  async validateVoucher(input:Record<string,unknown>,actor:Address):Promise<ValidVoucher>{

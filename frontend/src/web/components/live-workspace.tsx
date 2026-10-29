@@ -22,6 +22,7 @@ import {
   agentAbi,
   providerAbi,
   vaultAbi,
+  negotiationAbi,
   type Version,
   type SignedReceipt,
 } from "@sluice/sdk";
@@ -29,6 +30,7 @@ import { useApi, ApiConnection, ApiSignIn } from "./api-session";
 import { ReceiptRecords, EvidenceRecords } from "./receipt-records";
 import { WalletHub } from "./wallet-hub";
 import { AgentProfile } from "./agent-profile";
+import {ArbitrationConsent,NegotiationActions,DisputeAssistant,type NegotiationState} from "./negotiation";
 import { ProviderListings } from "./api-directory";
 import { WalletControl } from "./wallet-control";
 import {
@@ -536,6 +538,7 @@ function WalletDetail({
                   )}
                 </Card>
               )}
+              {section === "wallet-budgets" && isAddress(budgetProvider) && <ArbitrationConsent key={w.address+budgetProvider+address} wallet={w.address} provider={budgetProvider} owner={isOwner}/>}
               {isOwner && (
                 <div className="live-grid">
                   {section === "wallet" && (
@@ -1006,7 +1009,7 @@ function ProviderPanel() {
             void tx.execute(async () => {
               const payout = addr(form.get("payout")),
                 window = Number(form.get("window")),
-                arbiter = addr(form.get("arbiter")),
+                arbiter = zero,
                 metadata = keccak256(toHex(String(form.get("metadata"))));
               if (!Number.isInteger(window) || window < 0 || window > 604800)
                 throw Error("Choose a dispute window from 0 to 604800 seconds");
@@ -1050,11 +1053,7 @@ function ProviderPanel() {
             type="number"
             defaultValue={String(profile.value?.entry.disputeWindow ?? 3600)}
           />
-          <Field
-            label="Preferred arbiter (zero address = protocol default)"
-            name="arbiter"
-            defaultValue={profile.value?.entry.preferredArbiter || zero}
-          />
+          <div className="field-help"><strong>Dispute resolution</strong><p>Provider registrations use the protocol’s configured arbiter. Custom arbiter addresses cannot be entered here. Saving an existing provider resets its preference to the protocol default for future settlements.</p><p>Negotiated wallets enforce the approved protocol arbiter on-chain and require the wallet owner to accept the terms before settlement. Legacy wallets keep their original arbitration rules. The current last-resort arbiter is the protocol operator on Arc Testnet.</p></div>
           <Field
             label="Metadata JSON (hashed before submission)"
             name="metadata"
@@ -1110,24 +1109,26 @@ function ProviderPanel() {
   );
 }
 function DisputePanel({ record }: { record: string }) {
-  const { config, request, signedIn } = useApi(),
+  const { config, request, signedIn,sessionAddress } = useApi(),
     { address } = useAccount(),
     client = usePublicClient(),
     tx = useTransaction(),
-    state = useRead<{ id: string; settlement: Settlement }>(
+    state = useRead<{ id: string; settlement: Settlement;vault:Address;negotiated:boolean }>(
       "/settlements/" + encodeURIComponent(record),
     ),
-    details = useRead<{ dispute: Dispute }>(
+    details = useRead<{ dispute: Dispute;negotiation?:NegotiationState }>(
       "/disputes/" + encodeURIComponent(record),
     );
   const [now, setNow] = useState(0),
-    [evidence, setEvidence] = useState("");
+    [evidence, setEvidence] = useState(""),[evidenceWarning,setEvidenceWarning]=useState("");
   useEffect(() => {
     const tick = () => setNow(Math.floor(Date.now() / 1000));
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, []);
+  const vaultAddress=state.value?.vault||config?.contracts.disputeVault;
+  const negotiated=!!state.value?.negotiated;
   const s = state.value?.settlement,
     d = details.value?.dispute;
   const ownerState = useRead<WalletState>(s ? "/wallets/" + s.wallet : null);
@@ -1165,10 +1166,10 @@ function DisputePanel({ record }: { record: string }) {
         <>
           <div className="grid-three app-stats">
             <Stat
-              label="Payment held"
+              label="Settlement amount"
               hint={
                 s.token.toLowerCase() === siteConfig.usdc.toLowerCase()
-                  ? "USDC · held in the refund vault"
+                  ? "USDC · original payment after protocol fee"
                   : "Token base units"
               }
             >
@@ -1204,6 +1205,7 @@ function DisputePanel({ record }: { record: string }) {
             </p>
           </Card>
           <ApiSignIn />
+          {evidenceWarning&&<Callout title="Evidence needs another save" tone="warn">{evidenceWarning}</Callout>}
           {d && <EvidenceRecords id={record} />}
           {d && (
             <Card>
@@ -1216,18 +1218,18 @@ function DisputePanel({ record }: { record: string }) {
                     status: "Recorded",
                   },
                   {
-                    title: "Provider response deadline",
+                    title: negotiated ? "Negotiation deadline" : "Provider response deadline",
                     detail: timestamp(d.responseDeadline),
-                    status: d.providerResponded
+                    status: d.resolved ? "Resolved" : d.providerResponded
                       ? "Responded"
                       : now >= Number(d.responseDeadline)
                         ? "Expired"
                         : "Waiting",
                   },
-                  ...(d.providerResponded
+                  ...((negotiated || d.providerResponded)
                     ? [
                         {
-                          title: "Arbiter deadline",
+                          title: negotiated ? "Final deadline (fixed at claim opening)" : "Arbiter deadline",
                           detail: timestamp(d.arbiterDeadline),
                           status: d.resolved
                             ? "Resolved"
@@ -1241,8 +1243,10 @@ function DisputePanel({ record }: { record: string }) {
               />
             </Card>
           )}
+          {d && negotiated && vaultAddress && <NegotiationActions key={record+address} id={h32(record)} vault={vaultAddress} provider={s.provider} token={s.token} amount={d.amount} owner={ownsWallet} deadline={d.responseDeadline} arbiterDeadline={d.arbiterDeadline} arbiter={s.arbiter} responded={d.providerResponded} resolved={d.resolved} now={now} state={details.value?.negotiation} execute={tx.execute} write={tx.write} busy={tx.busy}/>}
+          {d && (ownsWallet||address?.toLowerCase()===s.provider.toLowerCase()||address?.toLowerCase()===s.arbiter.toLowerCase()) && <DisputeAssistant key={record+sessionAddress} id={record}/>}
           <Card>
-            <h2>Payment actions</h2>
+            <h2>Payment actions</h2>{d?.resolved && <p>This payment is finalized. No further resolution is required.</p>}
             <p className="muted small">
               Amounts below are in the settlement token’s base units. The wallet
               previews each transaction before signing.
@@ -1254,7 +1258,7 @@ function DisputePanel({ record }: { record: string }) {
                   onClick={() =>
                     void tx.execute(async () => {
                       await tx.write(
-                        config.contracts.disputeVault!,
+                        vaultAddress!,
                         vaultAbi,
                         "release",
                         [h32(record)],
@@ -1275,7 +1279,7 @@ function DisputePanel({ record }: { record: string }) {
                     onClick={() =>
                       void tx.execute(async () => {
                         await tx.write(
-                          config.contracts.disputeVault!,
+                          vaultAddress!,
                           vaultAbi,
                           "releaseUndisputed",
                           [h32(record)],
@@ -1295,7 +1299,7 @@ function DisputePanel({ record }: { record: string }) {
                     onClick={() =>
                       void tx.execute(async () => {
                         await tx.write(
-                          config.contracts.disputeVault!,
+                          vaultAddress!,
                           vaultAbi,
                           "autoRefund",
                           [h32(record)],
@@ -1315,7 +1319,7 @@ function DisputePanel({ record }: { record: string }) {
                     onClick={() =>
                       void tx.execute(async () => {
                         await tx.write(
-                          config.contracts.disputeVault!,
+                          vaultAddress!,
                           vaultAbi,
                           "arbiterTimeout",
                           [h32(record)],
@@ -1335,15 +1339,15 @@ function DisputePanel({ record }: { record: string }) {
                   void tx.execute(async () => {
                     if (!client) throw Error("Connect a wallet first");
                     const bond = (await client.readContract({
-                      address: config.contracts.disputeVault!,
-                      abi: vaultAbi,
-                      functionName: "disputeBond",
-                      args: [s.token],
+                      address: vaultAddress!,
+                      abi: negotiated ? negotiationAbi : vaultAbi,
+                      functionName: negotiated ? "settlementBond" : "disputeBond",
+                      args: [negotiated ? h32(record) : s.token],
                     })) as bigint;
                     const approveBond = async () => {
                       if (bond > 0n)
                         await tx.write(s.token, erc20, "approve", [
-                          config.contracts.disputeVault!,
+                          vaultAddress!,
                           bond,
                         ]);
                     };
@@ -1355,17 +1359,8 @@ function DisputePanel({ record }: { record: string }) {
                       throw Error(
                         "Enter a refund amount within the held payment",
                       );
-                    const savedEvidence = await request<{ evidenceHash: Hex }>(
-                      "/disputes/" + record + "/evidence",
-                      {
-                        method: "POST",
-                        body: JSON.stringify({
-                          content: String(form.get("evidence")),
-                        }),
-                      },
-                      true,
-                    );
-                    const evidenceHash = savedEvidence.evidenceHash,
+                    const content=String(form.get("evidence"));setEvidence(content);setEvidenceWarning("");
+                    const evidenceHash = keccak256(toHex(content)),
                       voucherId = String(form.get("receipt") || "").trim();
                     if (voucherId) {
                       const proof = await request<{
@@ -1382,7 +1377,7 @@ function DisputePanel({ record }: { record: string }) {
                       const r = proof.receipt;
                       await approveBond();
                       await tx.write(
-                        config.contracts.disputeVault!,
+                        vaultAddress!,
                         vaultAbi,
                         "openDisputeWithReceipt",
                         [
@@ -1407,12 +1402,13 @@ function DisputePanel({ record }: { record: string }) {
                         );
                       await approveBond();
                       await tx.write(
-                        config.contracts.disputeVault!,
+                        vaultAddress!,
                         vaultAbi,
                         "openDispute",
                         [h32(record), amount, 1, evidenceHash],
                       );
                     }
+                    try{await request("/disputes/"+record+"/evidence",{method:"POST",body:JSON.stringify({content})},true);}catch{setEvidenceWarning("The claim is confirmed on-chain, but the explanation was not saved. Use Save evidence privately below to retry.");}
                   });
                 }}
               >
@@ -1518,7 +1514,7 @@ function DisputePanel({ record }: { record: string }) {
                     onClick={() =>
                       void tx.execute(async () => {
                         await tx.write(
-                          config.contracts.disputeVault!,
+                          vaultAddress!,
                           vaultAbi,
                           "acceptDispute",
                           [h32(record)],
@@ -1535,7 +1531,7 @@ function DisputePanel({ record }: { record: string }) {
                         event.preventDefault();
                         void tx.execute(async () => {
                           await tx.write(
-                            config.contracts.disputeVault!,
+                            vaultAddress!,
                             vaultAbi,
                             "respondToDispute",
                             [h32(record), await evidenceHash()],
@@ -1562,7 +1558,7 @@ function DisputePanel({ record }: { record: string }) {
                   )}
                 </>
               )}
-            {d &&
+            {!negotiated && d &&
               !d.resolved &&
               d.providerResponded &&
               now < Number(d.arbiterDeadline) &&
@@ -1581,7 +1577,7 @@ function DisputePanel({ record }: { record: string }) {
                       if (refund < 0n || refund > amount)
                         throw Error("Refund exceeds the disputed amount");
                       await tx.write(
-                        config.contracts.disputeVault!,
+                        vaultAddress!,
                         vaultAbi,
                         "arbiterDecide",
                         [

@@ -12,10 +12,10 @@ import {
   walletAbis,
   factoryAbis,
   agentAbi,
-  vaultAbi,
+  vaultAbi,negotiationAbi,
   reputationAbi,
 } from "./contracts";
-import { channelState, detectWallet, type Factory } from "./chain";
+import { channelState, detectWallet, assertNegotiationConsent,type Factory } from "./chain";
 import { getProviderProfile, verifyDomain } from "./profiles";
 import { MemoryAgentStore, type AgentStore, type Channel } from "./store";
 import {
@@ -163,6 +163,7 @@ export class AgentPayClient {
       version,
       !!domainProof,
     );
+    if(version===3)await assertNegotiationConsent(this.options.publicClient,this.options.wallet,quote.provider,quote.token,this.options.factories);
     const key = [
       this.options.chainId,
       this.options.wallet,
@@ -419,6 +420,8 @@ export class AgentPayClient {
       [this.options.wallet, hash(metadataHash)],
     );
   }
+  async disputeVaultAddress():Promise<Address>{const version=await detectWallet(this.options.publicClient,this.options.wallet,this.options.factories);if(version!==3)throw Error('This wallet version has no dispute vault');const factory=await this.options.publicClient.readContract({address:this.options.wallet,abi:walletAbis[3],functionName:'factory'}) as Address;return await this.options.publicClient.readContract({address:factory,abi:factoryAbis[3],functionName:'disputeVault'}) as Address;}
+  async acceptArbitrationTerms(provider:Address,token:Address){const vault=await this.disputeVaultAddress();const expected=await this.options.publicClient.readContract({address:vault,abi:negotiationAbi,functionName:'arbitrationTermsHash',args:[provider,token]});return this.write(vault,negotiationAbi,'acceptArbitrationTerms',[this.options.wallet,provider,token,expected]);}
   async openDispute(input: {
     id: Hex;
     amount: bigint;
@@ -427,7 +430,7 @@ export class AgentPayClient {
     receipt?: SignedReceipt;
     proof?: Hex[];
   }) {
-    if (!this.options.vault) throw Error("Dispute vault not configured");
+    const vault=await this.disputeVaultAddress();
     if (
       (await detectWallet(
         this.options.publicClient,
@@ -440,7 +443,7 @@ export class AgentPayClient {
       const r = input.receipt;
       if (!(await verifyReceipt(r))) throw Error("Invalid receipt signature");
       return this.write(
-        this.options.vault,
+        vault,
         vaultAbi,
         "openDisputeWithReceipt",
         [
@@ -459,7 +462,7 @@ export class AgentPayClient {
         ],
       );
     }
-    return this.write(this.options.vault, vaultAbi, "openDispute", [
+    return this.write(vault, vaultAbi, "openDispute", [
       hash(input.id),
       input.amount,
       input.reasonCode,
@@ -467,10 +470,10 @@ export class AgentPayClient {
     ]);
   }
   async trackDispute(id: Hex) {
-    if (!this.options.vault) throw Error("Dispute vault not configured");
+    const vault=await this.disputeVaultAddress();
     const read = (functionName: string) =>
       this.options.publicClient.readContract({
-        address: this.options.vault!,
+        address: vault,
         abi: vaultAbi,
         functionName,
         args: [hash(id)],

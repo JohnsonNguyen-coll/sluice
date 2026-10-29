@@ -109,6 +109,15 @@ Keep private keys/state in ignored .env/.tools files; never print or commit them
 
 ## Workspace layout
 
+Negotiation-first extension (2026-10-30): see `docs/NEGOTIATION_DELIVERY.md`.
+Active V3 factory is `NegotiationWalletFactory`; active vault is `NegotiationDisputeVault`.
+Canonical addresses are in the deployment manifest. New wallets require owner terms
+consent and a registered provider with a nonzero hold. Negotiation lasts 30 minutes;
+explicit escalation enables final arbitration before the fixed additional 24-hour deadline.
+AI analysis is optional and non-binding, with explicit private-evidence export consent.
+Historical wallets/disputes retain their original vault and deadlines. The current
+approved arbiter is the protocol operator EOA; do not describe it as independent.
+
 - `contract/`: Solidity in `src/`, Foundry tests/scripts/lib, deployment tooling, metadata and deployment records.
 - `frontend/`: Next.js app, public assets, web config/tests and `docs/WEBSITE.md`.
 - `backend/`: Bun API, private Supabase schema, SDK/middleware packages and integration examples.

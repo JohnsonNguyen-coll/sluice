@@ -1,0 +1,30 @@
+{
+  "setup": {
+    "providerGas": "0xc51e50da0200181a8ac4e4571bf7b1d3235648e4ecf078f34bd9ee3a40300e95",
+    "providerRegistration": "0x5b66e3479f133d58e6e9e042f5ca620d4e5a3b8bfa8bfb22a337972b4dd3dff4",
+    "walletCreation": "0xe8ec0fbdd3efb11fecc331eb87db459e014c90bfdfffda6ac48abe6a58533ebf",
+    "deposit": "0xcbab02ab299c6e4fcce460cefe7d110fa4efa5b1ce00daeee461008ba25b21d6",
+    "budget": "0xeaea7ba9b61f646798507256cf6a675617549369a105acc1fccaf2c255b1d9cf",
+    "terms": "0x12e217d2b64d6135c55b183e1e193c5c52b8cc910ccb2d55934625cddfdf1acb",
+    "bondAllowance": "0x42381ee2fe050e3c8b00dbf8d45ef25a972278f3102dbce45ae4cc2bbc6732d9",
+    "claim": "0xfe6d69375cbf65dafc26e7f2dd0f1f4f80de4f17dff01962e9aea15d7c127aa1",
+    "proposal": "0xc31db97a368bd10f96afd03007b66c10d82461a0188d5a4ed2576fa5283412ee",
+    "agreement": "0x6f63a1468e4e8c6ed4770e40de0d1f97a1c15627726a976255d885d1d0507b64"
+  },
+  "createdAt": "2026-10-29T17:14:15.575Z",
+  "chainId": 5042002,
+  "factory": "0x6F753e100dE35d30Ac978363E7737595152E9D03",
+  "vault": "0x4cb34a1ae20007561A90826086f1c3A3e72037F2",
+  "provider": "0x23683Ab630B8e8C7251c64B7222aD41435cfD026",
+  "owner": "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+  "wallet": "0x41b9bF207F0c551Cc7aDffCb72827EFe75818afC",
+  "voucherId": "0xe575e650264ae9033325cf135af98c22169a8a9b982a95b23335799bd0af35f9",
+  "settleTx": "0x4008a7cdf827f09a0f368e6aade37811c54022f3f7c530116bdd7efaf2661821",
+  "settlementId": "0xf1b59e907d7bc06504bfb02e550a76ebbb0925c11ebc4a2438b6b1d780c0be29",
+  "privateEvidenceStored": true,
+  "finalState": 3,
+  "apiResolved": true,
+  "arbiterUsed": false,
+  "status": "passed",
+  "updatedAt": "2026-10-29T17:15:01.796Z"
+}

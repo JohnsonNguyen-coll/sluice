@@ -1,3 +1,4 @@
+import {assistantConfig,analyzeDispute} from './dispute-assistant';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {createSiweMessage} from 'viem/siwe';
 import {verifyMessage,keccak256,toHex,type Address} from 'viem';
@@ -18,7 +19,7 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
  async function actor(req:Request){const token=req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];if(!token)fail(401,'UNAUTHORIZED','A wallet session bearer token is required');const value=await store.session(digest(token));if(!value)fail(401,'UNAUTHORIZED','Session expired or invalid');return address(value);}
  async function route(req:Request,url:URL){
   const path=url.pathname.replace(/\/$/,'')||'/';
-  if(path==='/config'&&req.method==='GET')return json({chainId:config.chainId,factories:config.factories,contracts:{agentRegistry:config.agentRegistry,providerRegistry:config.providerRegistry,reputationRegistry:config.reputationRegistry,disputeVault:config.disputeVault}});
+  if(path==='/config'&&req.method==='GET')return json({chainId:config.chainId,factories:config.factories,negotiationVaults:config.negotiationVaults||[],legacyDisputeVaults:config.legacyDisputeVaults||[],contracts:{agentRegistry:config.agentRegistry,providerRegistry:config.providerRegistry,reputationRegistry:config.reputationRegistry,disputeVault:config.disputeVault}});
   if(path==='/health'&&req.method==='GET'){
    const status=await Promise.allSettled([store.health(),chain.health()]);
    const database=status[0].status==='fulfilled'?'ready':'unavailable',rpc=status[1].status==='fulfilled'?'ready':'unavailable';
@@ -72,6 +73,7 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    for(const record of records){const receipt=record.receipt;if(receipt.chainId===config.chainId&&receipt.wallet.toLowerCase()===wallet.toLowerCase()&&Number(receipt.receipt.timestamp)<=Math.floor(clock()/1000)+60&&await verifyReceipt(receipt)){lastPayment={timestamp:receipt.receipt.timestamp,provider:receipt.provider,amount:receipt.receipt.amount,token:receipt.receipt.token,settled:!!record.commitment};break;}}
    return json({profile:saved?.owner.toLowerCase()===who.toLowerCase()?saved:null,lastPayment,agentRuntimeStatus:'unknown',notice:'A provider-signed receipt is payment activity, not proof that an AI agent is currently running.'});
   }
+  const arbitrationPath=path.match(/^\/wallets\/(0x[a-fA-F0-9]{40})\/arbitration$/);if(arbitrationPath&&req.method==='GET')return json(await chain.arbitrationTerms(address(arbitrationPath[1]),address(url.searchParams.get('provider'),'provider'),address(url.searchParams.get('token'),'token')));
   if(path==='/wallets'&&req.method==='GET')return json(await chain.wallets(address(url.searchParams.get('owner'),'owner'),url));
   let match=path.match(/^\/wallets\/([^/]+)(?:\/(budgets|activity))?$/);
   if(match&&req.method==='GET'){const wallet=address(match[1],'wallet');if(match[2]==='budgets')return json(await chain.budgets(wallet,address(url.searchParams.get('provider'),'provider'),url.searchParams.has('token')?address(url.searchParams.get('token'),'token'):undefined));if(match[2]==='activity')return json(await chain.activity(wallet,url));return json(await chain.wallet(wallet));}
@@ -88,6 +90,8 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
   if(path==='/settlements'&&req.method==='GET')return json(await chain.settlements(url));
   if(path==='/disputes'&&req.method==='GET')return json(await chain.settlements(url,true));
   match=path.match(/^\/(settlements|disputes)\/(0x[a-fA-F0-9]{64})$/);if(match&&req.method==='GET')return json(await chain.settlement(hex(match[2],32),match[1]==='disputes'));
+  const analysisPath=path.match(/^\/disputes\/(0x[a-fA-F0-9]{64})\/analysis$/);
+  if(analysisPath&&(req.method==='GET'||req.method==='POST')){const id=hex(analysisPath[1],32),who=await actor(req);await chain.authorizeEvidence(id,who);if(req.method==='GET')return json(assistantConfig());rate('ai:'+who.toLowerCase(),3);const input=await body(req);if(input.confirmExternalProcessing!==true)fail(400,'CONSENT_REQUIRED','Confirm sending the selected private evidence to the configured model provider');if(!Array.isArray(input.evidenceIds)||input.evidenceIds.length>20||input.evidenceIds.some(id=>typeof id!=='string'))fail(400,'INVALID_EVIDENCE','Select at most 20 evidence IDs');const ids=new Set(input.evidenceIds as string[]);const evidence=(await store.evidence(id.toLowerCase()) as {id:string}[]).filter(record=>ids.has(record.id));if(!evidence.length||evidence.length!==ids.size)fail(400,'INVALID_EVIDENCE','Select existing evidence records');return json(await analyzeDispute({settlement:await chain.settlement(id,true),evidence}));}
   match=path.match(/^\/disputes\/(0x[a-fA-F0-9]{64})\/evidence$/);
   if(match&&(req.method==='POST'||req.method==='GET')){
    const id=hex(match[1],32),who=await actor(req);await chain.authorizeEvidence(id,who);

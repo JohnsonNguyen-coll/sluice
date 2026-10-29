@@ -4,7 +4,7 @@ import {
   type PublicClient,
   type Abi,
 } from "viem";
-import { walletAbis, factoryAbis } from "./contracts";
+import { walletAbis, factoryAbis,negotiationAbi } from "./contracts";
 import {
   parseVoucher,
   voucherData,
@@ -12,7 +12,7 @@ import {
   type Version,
   type SignedVoucher,
 } from "./protocol";
-export type Factory = { address: Address; version: Version };
+export type Factory = { address: Address; version: Version; negotiationVault?:Address };
 export async function detectWallet(
   client: PublicClient,
   wallet: Address,
@@ -130,4 +130,12 @@ export async function verifyVoucherOnChain(
     account: v.provider,
   });
   return { ...state, delta: BigInt(v.cumulativeAmount) - state.settled };
+}
+
+export async function assertNegotiationConsent(client:PublicClient,wallet:Address,provider:Address,token:Address,factories:readonly Factory[]){
+ const governed=factories.filter(factory=>factory.negotiationVault);if(!governed.length)return;
+ for(const factory of governed){if(await client.readContract({address:factory.address,abi:factoryAbis[factory.version],functionName:'isFactoryWallet',args:[wallet]})){
+ const preferred=await client.readContract({address:wallet,abi:walletAbis[3],functionName:'payoutToken',args:[provider]}) as Address;
+ await client.readContract({address:factory.negotiationVault!,abi:negotiationAbi,functionName:'assertArbitrationConsent',args:[wallet,provider,preferred==='0x0000000000000000000000000000000000000000'?token:preferred]});return;
+ }}
 }

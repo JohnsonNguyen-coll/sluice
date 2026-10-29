@@ -142,3 +142,9 @@ bun --env-file=../backend/.env --env-file=.env run scripts/phase3-testnet-e2e.ts
 ```
 
 The silence and arbiter-timeout scenarios preserve actual 3-day deadlines. Until their recorded readyAt times pass and transactions confirm, they remain pending rather than reported as completed.
+
+## Negotiation-first wallets
+
+See [NEGOTIATION_DELIVERY.md](NEGOTIATION_DELIVERY.md) for current rules and trust limits. Use factory descriptors from `GET /config`, including `negotiationVault`. After funding a negotiated wallet and setting a provider budget, the owner reviews the terms and calls `await sdk.acceptArbitrationTerms(provider, token)`. Providers must be registered with a nonzero dispute hold. The SDK checks consent before signing; the wallet enforces it at settlement. Terms changes require renewed owner acceptance and can block pending vouchers. The voucher EIP-712 format remains unchanged.
+
+The SDK resolves the actual wallet factory's vault for claims and tracking. Do not route historical claims to the current active vault solely because both use V3 interfaces. The legacy resume command above selects the historical deployment recorded in its report. Use `contract/scripts/negotiation-testnet-e2e.ts` for the new agreement smoke test.

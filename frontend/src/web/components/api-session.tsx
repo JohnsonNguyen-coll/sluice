@@ -13,6 +13,8 @@ import type { Factory } from "@sluice/sdk";
 import { Button, Callout } from "./ui";
 export type ApiConfig = {
   chainId: number;
+  negotiationVaults?:Address[];
+  legacyDisputeVaults?:Address[];
   factories: Factory[];
   contracts: {
     agentRegistry?: Address;

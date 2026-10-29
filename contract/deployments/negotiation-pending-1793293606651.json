@@ -1,0 +1,54 @@
+{
+  "chainId": 5042002,
+  "deployedAt": "2026-10-29T17:06:46.755Z",
+  "contracts": {
+    "NegotiationDisputeVault": {
+      "address": "0x4cb34a1ae20007561a90826086f1c3a3e72037f2",
+      "txHash": "0x412890dad6f1c04ed38b31c0425ecbc3df3fd5395ceef34b116a41c1665ec0f0",
+      "blockNumber": "69702475",
+      "constructorArgs": [
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        "0x52568Fe53Bc59c2aac6295eC351F928D8ABBce92",
+        "0x88B9D58a32B279B959bBb1F7143A7f18Aaf2Da58"
+      ],
+      "runtimeHash": "0xe01f95825fd29f89844dadc7f3ad96ae2a8372b75fadb2e85bc6bbbaf4fd45c9"
+    },
+    "NegotiationWalletFactory": {
+      "address": "0x6f753e100de35d30ac978363e7737595152e9d03",
+      "txHash": "0x1fc23f8452885b45749867f9e0377f6fb807b40fc15b6c3a05cd6ca752557c86",
+      "blockNumber": "69702478",
+      "constructorArgs": [
+        "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+        30,
+        [
+          "0x3600000000000000000000000000000000000000"
+        ],
+        "0x4cb34a1ae20007561a90826086f1c3a3e72037f2",
+        "0x52568Fe53Bc59c2aac6295eC351F928D8ABBce92",
+        "0x88B9D58a32B279B959bBb1F7143A7f18Aaf2Da58"
+      ],
+      "runtimeHash": "0x17e8e685bd1aa7cbfd6ae99774a2eec396dce60cb52dff213ab115c6396d222c"
+    }
+  },
+  "configurationTransactions": [
+    "0xa3c126f650364a57313d557e52fee816b498adbc4ec8e29bdbba956068a20c9e",
+    "0x40b931c37cb4fa8b28ab24a65a0dcb216ea9a3d5c380d854a3a4bd6c30c84ffa",
+    "0x354880473a765ef40716cf6420ef7fea6dba9f169fc7434f5dd73af6cffdb4f9",
+    "0x6b771ef2f2812213626fea5ee040c98e7a1cd78d5c0658cc606229d29c5a5af4",
+    "0x5d0cc53cb00c5b89ea2047d3a0d3315ef46320ef4fc749aa4a19423b8465abe6",
+    "0x077670ab55e23fc27fe490b2f73f1e03f9a86894783b97a0bef09d66e269783c"
+  ],
+  "policy": {
+    "negotiationSeconds": 1800,
+    "arbitrationSeconds": 86400,
+    "timeout": "refund disputed principal and bond",
+    "maxDisputeUsdc": "100",
+    "bondUsdc": "0.1",
+    "arbiter": "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02"
+  },
+  "sourceHashes": {
+    "NegotiationDisputeVault": "0x5b6dd7c70a3864504bd9fbc55d2d7aa1f01a37e5262df1745a88b10ef4ee8c01",
+    "NegotiationAgentWallet": "0x5aea6dfd241dd6f0b0be1754762c1c493e02232f9ef0a658c5c7f6fd91fb7ed3",
+    "NegotiationWalletFactory": "0x52aedfded6d11f9d8118460d4785bcc382671d6b754dbcc2ddde9c93bccdb2c8"
+  }
+}

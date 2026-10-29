@@ -45,6 +45,16 @@ function request(path:string,method='GET',payload?:unknown,token?:string,origin?
 async function login(who=account){const ip=crypto.randomUUID();const challenge=await (await request('/auth/nonce','POST',{address:who.address},undefined,undefined,ip)).json();const signature=await who.signMessage({message:challenge.message});const response=await request('/auth/verify','POST',{id:challenge.id,signature},undefined,undefined,ip);expect(response.status).toBe(200);return {token:(await response.json()).token as string,id:challenge.id,signature};}
 beforeAll(async()=>{db=new PGlite();await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');await db.exec(await Bun.file(new URL('../supabase/migrations/202610290001_backend.sql',import.meta.url)).text());await db.exec('set role service_role');api=createApi(config,store,new TestChain(config));},30000);
 afterAll(async()=>{await db.close();});
+
+test('AI analysis requires a dispute party, explicit external-processing consent and existing evidence',async()=>{
+ expect((await request('/disputes/'+settlement+'/analysis')).status).toBe(401);
+ const outsider=await login(stranger);
+ expect((await request('/disputes/'+settlement+'/analysis','GET',undefined,outsider.token)).status).toBe(403);
+ const {token}=await login();
+ expect((await request('/disputes/'+settlement+'/analysis','GET',undefined,token)).status).toBe(200);
+ expect((await request('/disputes/'+settlement+'/analysis','POST',{evidenceIds:[]},token)).status).toBe(400);
+ expect((await request('/disputes/'+settlement+'/analysis','POST',{confirmExternalProcessing:true,evidenceIds:['unknown']},token)).status).toBe(400);
+});
 test('SIWE login is address bound; challenge is consumed exactly once',async()=>{
  const challenge=await (await request('/auth/nonce','POST',{address:account.address})).json();
  expect(challenge.message).toContain('127.0.0.1:3010 wants you to sign in');
