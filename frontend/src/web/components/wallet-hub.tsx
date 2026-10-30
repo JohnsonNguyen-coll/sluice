@@ -287,7 +287,7 @@ export function WalletHub({ home = false }: { home?: boolean }) {
                 <div className="wallet-card-bottom">
                   <span className="muted small">
                     {info
-                      ? "V" + info.version + " · Arc Testnet"
+                      ? "Arc Testnet"
                       : "Connection unavailable"}
                   </span>
                   <Link href={routes.wallet(row.address)}>

@@ -264,6 +264,9 @@ function CreateWallet() {
     { address } = useAccount(),
     router = useRouter(),
     tx = useTransaction();
+  const factory = config?.factories.find(
+    (candidate) => candidate.version === 3 && !!candidate.negotiationVault,
+  );
   return (
     <Card className="create-payment-wallet">
       <div className="form-step-label">STEP 1 OF 3 · CREATE A WALLET</div>
@@ -273,16 +276,25 @@ function CreateWallet() {
         signing address. This creates a payment account, not an AI agent. You
         can fund it and connect your agent after creation.
       </p>
+      <div className="live-actions" aria-label="Payment wallet features">
+        <span className="badge">Multi-token support</span>
+        <span className="badge">Spending controls</span>
+        <span className="badge">Signed receipts</span>
+        <span className="badge">Disputes &amp; refunds</span>
+      </div>
+      <p className="field-help">
+        Pay with tokens enabled on this network, set spending limits and keep
+        signed receipts. Request refunds under the provider’s agreed dispute terms.
+      </p>
       <form
         className="live-form"
         onSubmit={(event) => {
           const form = data(event);
           void tx.execute(async () => {
             if (!address || !config) throw Error("Connect a wallet first");
-            const version = Number(form.get("version")) as Version,
-              factory = config.factories.find((f) => f.version === version);
             if (!factory)
-              throw Error("This wallet version is not available yet");
+              throw Error("Payment wallet creation is currently unavailable");
+            const version = factory.version;
             const window = Number(form.get("window"));
             if (!Number.isInteger(window) || window < 600)
               throw Error("Settlement grace must be at least 600 seconds");
@@ -321,21 +333,6 @@ function CreateWallet() {
         </p>
         <details className="workspace-disclosure">
           <summary>Advanced wallet settings</summary>
-          <label className="live-field">
-            <span>Contract version</span>
-            <select name="version" defaultValue="3">
-              {[3, 2, 1]
-                .filter((v) => config?.factories.some((f) => f.version === v))
-                .map((v) => (
-                  <option key={v} value={v}>
-                    V{v}
-                    {v === 3
-                      ? " — Recommended · receipts & refunds"
-                      : " — Legacy compatibility"}
-                  </option>
-                ))}
-            </select>
-          </label>
           <Field
             label="Time to finish pending payments (seconds)"
             name="window"
@@ -352,7 +349,10 @@ function CreateWallet() {
             Connect your wallet using the button in the navigation to continue.
           </p>
         )}
-        <Button disabled={tx.busy || !address || !config}>
+        {config && !factory && (
+          <p role="alert" className="live-error">Payment wallet creation is currently unavailable. Please try again later.</p>
+        )}
+        <Button disabled={tx.busy || !address || !factory}>
           {tx.busy ? "Creating your wallet…" : "Create payment wallet"}
         </Button>
       </form>
@@ -441,7 +441,7 @@ function WalletDetail({
             <Stat label="USDC balance" hint="Live on-chain balance">
               {balance ?? "—"}
             </Stat>
-            <Stat label="Payment wallet" hint={"Version " + w.version}>
+            <Stat label="Payment wallet" hint="Owner-controlled funds">
               {w.paused ? "Paused" : "Active"}
             </Stat>
             <Stat label="Agent signer" hint="Separate from wallet ownership">
@@ -1156,7 +1156,7 @@ function DisputePanel({ record }: { record: string }) {
     return (
       <EmptyState
         title="Disputes are not available yet."
-        description="A verified V3 contract release is required on this network."
+        description="Payment wallets with refund support are not configured on this network."
       />
     );
   return (
