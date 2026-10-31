@@ -56,7 +56,7 @@
 .marketing-main:has(.landing-redesign){max-width:none;padding:0}
 .landing-redesign{position:relative;isolation:isolate;overflow:clip}
 .landing-container{width:100%;max-width:1240px;margin-inline:auto;padding-inline:40px}
-.veil-backdrop{position:absolute;inset:0 0 auto;height:1060px;z-index:-1;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 55% 20%,#4e60a42b,transparent 70%)}
+.veil-backdrop{position:absolute;inset:0 0 auto;height:1060px;z-index:-1;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse 58% 48% at 78% 9%,#7489e04f,transparent 70%),radial-gradient(ellipse 42% 60% at 18% 29%,#5366a438,transparent 74%),radial-gradient(ellipse 52% 42% at 53% 61%,#384a8a2b,transparent 76%),linear-gradient(145deg,#11182d 0%,#0b1020 45%,var(--bg) 88%)}
 .dark-veil-container,.dark-veil-canvas{display:block;position:relative;width:100%;height:100%}
 .veil-shading{position:absolute;inset:0;background:linear-gradient(0deg,var(--bg) 0%,transparent 40%),radial-gradient(ellipse at 50% 40%,color-mix(in srgb,var(--bg) 30%,transparent),transparent 72%)}
 .editorial-hero{text-align:center;padding-top:100px;padding-bottom:90px}
