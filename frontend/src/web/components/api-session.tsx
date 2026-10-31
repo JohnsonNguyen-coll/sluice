@@ -169,14 +169,14 @@ export function useApi() {
   if (!value) throw Error("API session provider missing");
   return value;
 }
-export function ApiSignIn() {
+export function ApiSignIn({ label = "Unlock my receipts", successLabel = "Private records unlocked" }: { label?: string; successLabel?: string }) {
   const { address } = useAccount();
   const { signIn, signedIn, signing } = useApi(),
     [error, setError] = useState("");
   return (
     <div>
       {signedIn ? (
-        <span className="badge badge-success">Private records unlocked</span>
+        <span className="badge badge-success">{successLabel}</span>
       ) : (
         <Button
           variant="secondary"
@@ -192,7 +192,7 @@ export function ApiSignIn() {
             );
           }}
         >
-          {signing ? "Waiting for signature…" : "Unlock my receipts"}
+          {signing ? "Waiting for signature…" : label}
         </Button>
       )}
       {!address && <p className="small muted">Connect your wallet first.</p>}

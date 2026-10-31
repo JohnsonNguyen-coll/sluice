@@ -19,7 +19,7 @@ export function AppPage({ id, record }: { id: RouteId; record?: string }) {
     "wallet-settings":
       "Manage ownership, payment controls and the key your agent uses to sign payments.",
     provider:
-      "Receive payments for your API. Set up your payout address, then connect the middleware to your service.",
+      "Connect an existing API, set a per-call price and receive agent payments.",
     "provider-settlements":
       "Review payment receipts and funds awaiting release. Only records available to your signed-in wallet appear here.",
     disputes:

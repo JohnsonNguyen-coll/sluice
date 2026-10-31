@@ -109,6 +109,8 @@ Keep private keys/state in ignored .env/.tools files; never print or commit them
 
 ## Workspace layout
 
+Hosted APIs (2026-10-30): `docs/HOSTED_APIS.md` documents real text-analysis/JSON-validation services, encrypted provider custody, SIWE owner controls, automatic settlement, and explicit gas funding. Supabase migrations 004/005 are required. Do not clear persistent provider leases without reconciling transactions. Never expose the managed encryption key or signer ciphertext through public APIs.
+
 Negotiation-first extension (2026-10-30): see `docs/NEGOTIATION_DELIVERY.md`.
 Active V3 factory is `NegotiationWalletFactory`; active vault is `NegotiationDisputeVault`.
 Canonical addresses are in the deployment manifest. New wallets require owner terms
@@ -123,3 +125,5 @@ approved arbiter is the protocol operator EOA; do not describe it as independent
 - `backend/`: Bun API, private Supabase schema, SDK/middleware packages and integration examples.
 - Run web commands from the repository root or `frontend/`; run Foundry directly from `contract/`.
 - Canonical generated chain facts are in `contract/config/onchain-facts.ts`; the frontend keeps a re-export compatibility entry point.
+
+Gateway onboarding (2026-10-31): `docs/API_GATEWAY.md` is the current Provider flow. Migration 006 stores encrypted upstream config. GET/POST JSON, public HTTPS IPv4 only; keys are server-side, test required before activation. Billing is per accepted attempt including upstream failures; never claim success-only charges or automatic refunds. Legacy utilities stay readable. Actual private-provider and new paid-gateway E2E are not yet validated.

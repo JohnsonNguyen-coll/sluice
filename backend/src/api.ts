@@ -11,14 +11,21 @@ import {SupabaseCatalogStore,shortText,httpsUrl,type CatalogStore,type ApiListin
 import deployment from '../../contract/deployments/arc-testnet.json';
 import {parseUnits} from 'viem';
 import {address,hex,uint,page,body} from './validation';
+import type {HostedApi} from './managed-host';
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,(_,v)=>typeof v==='bigint'?v.toString():v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>number=Date.now,catalog:CatalogStore=new SupabaseCatalogStore(config)){
+export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>number=Date.now,catalog:CatalogStore=new SupabaseCatalogStore(config),hosted?:HostedApi){
  const limits=new Map<string,{count:number;until:number}>();
  function rate(key:string,max:number){const now=clock();for(const[k,v]of limits)if(v.until<=now)limits.delete(k);if(limits.size>=10000&&!limits.has(key))fail(429,'RATE_LIMITED','Retry later');let r=limits.get(key);if(!r){r={count:0,until:now+60000};limits.set(key,r);}if(++r.count>max)fail(429,'RATE_LIMITED','Retry after one minute');}
  async function actor(req:Request){const token=req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];if(!token)fail(401,'UNAUTHORIZED','A wallet session bearer token is required');const value=await store.session(digest(token));if(!value)fail(401,'UNAUTHORIZED','Session expired or invalid');return address(value);}
+ async function authorizeEvidence(id:ReturnType<typeof hex>,who:Address){try{await chain.authorizeEvidence(id,who);}catch(error){if(!hosted||apiError(error)?.status!==403)throw error;const entry=await chain.settlement(id,true) as {settlement:{provider:Address}};if(!await hosted.ownsProvider(who,entry.settlement.provider))throw error;}}
  async function route(req:Request,url:URL){
   const path=url.pathname.replace(/\/$/,'')||'/';
+  if(path==='/managed-services/config'&&req.method==='GET')return json(hosted?.capabilities()||{available:false,templates:[],notice:'Hosted APIs are not configured'});
+  if(path==='/managed-services'&&(req.method==='GET'||req.method==='POST')){const who=await actor(req);if(!hosted)fail(503,'MANAGED_NOT_CONFIGURED','Hosted APIs are not configured');return req.method==='GET'?json(await hosted.list(who)):json(await hosted.create(who,await body(req)),201);}
+  const hostedPath=path.match(/^\/hosted\/([a-f0-9-]{36})$/);if(hostedPath){if(!hosted)fail(503,'MANAGED_NOT_CONFIGURED','Hosted APIs are not configured');return hosted.serve(hostedPath[1],req);}
+  const managedPath=path.match(/^\/managed-services\/([a-f0-9-]{36})\/(activate|pause|receipts|test|connection)$/);if(managedPath){const who=await actor(req);if(!hosted)fail(503,'MANAGED_NOT_CONFIGURED','Hosted APIs are not configured');if(req.method==='POST'&&managedPath[2]==='test'){rate('gateway-test:'+who,5);return json(await hosted.testConnection(who,managedPath[1],await body(req)));}if(req.method==='POST'&&managedPath[2]==='connection')return json(await hosted.updateConnection(who,managedPath[1],await body(req)));if(req.method==='POST'&&managedPath[2]==='activate')return json(await hosted.activate(who,managedPath[1]));if(req.method==='POST'&&managedPath[2]==='pause')return json(await hosted.pause(who,managedPath[1]));if(req.method==='GET'&&managedPath[2]==='receipts')return json(await hosted.receiptList(who,managedPath[1]));}
+  const managedDispute=path.match(/^\/disputes\/(0x[a-fA-F0-9]{64})\/managed-provider$/);if(managedDispute&&(req.method==='GET'||req.method==='POST')){const who=await actor(req);if(!hosted)fail(503,'MANAGED_NOT_CONFIGURED','Hosted APIs are not configured');const id=hex(managedDispute[1],32);return json(req.method==='GET'?await hosted.disputeService(who,id):await hosted.disputeAction(who,id,await body(req)));}
   if(path==='/config'&&req.method==='GET')return json({chainId:config.chainId,factories:config.factories,negotiationVaults:config.negotiationVaults||[],legacyDisputeVaults:config.legacyDisputeVaults||[],contracts:{agentRegistry:config.agentRegistry,providerRegistry:config.providerRegistry,reputationRegistry:config.reputationRegistry,disputeVault:config.disputeVault}});
   if(path==='/health'&&req.method==='GET'){
    const status=await Promise.allSettled([store.health(),chain.health()]);
@@ -91,10 +98,10 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
   if(path==='/disputes'&&req.method==='GET')return json(await chain.settlements(url,true));
   match=path.match(/^\/(settlements|disputes)\/(0x[a-fA-F0-9]{64})$/);if(match&&req.method==='GET')return json(await chain.settlement(hex(match[2],32),match[1]==='disputes'));
   const analysisPath=path.match(/^\/disputes\/(0x[a-fA-F0-9]{64})\/analysis$/);
-  if(analysisPath&&(req.method==='GET'||req.method==='POST')){const id=hex(analysisPath[1],32),who=await actor(req);await chain.authorizeEvidence(id,who);if(req.method==='GET')return json(assistantConfig());rate('ai:'+who.toLowerCase(),3);const input=await body(req);if(input.confirmExternalProcessing!==true)fail(400,'CONSENT_REQUIRED','Confirm sending the selected private evidence to the configured model provider');if(!Array.isArray(input.evidenceIds)||input.evidenceIds.length>20||input.evidenceIds.some(id=>typeof id!=='string'))fail(400,'INVALID_EVIDENCE','Select at most 20 evidence IDs');const ids=new Set(input.evidenceIds as string[]);const evidence=(await store.evidence(id.toLowerCase()) as {id:string}[]).filter(record=>ids.has(record.id));if(!evidence.length||evidence.length!==ids.size)fail(400,'INVALID_EVIDENCE','Select existing evidence records');return json(await analyzeDispute({settlement:await chain.settlement(id,true),evidence}));}
+  if(analysisPath&&(req.method==='GET'||req.method==='POST')){const id=hex(analysisPath[1],32),who=await actor(req);await authorizeEvidence(id,who);if(req.method==='GET')return json(assistantConfig());rate('ai:'+who.toLowerCase(),3);const input=await body(req);if(input.confirmExternalProcessing!==true)fail(400,'CONSENT_REQUIRED','Confirm sending the selected private evidence to the configured model provider');if(!Array.isArray(input.evidenceIds)||input.evidenceIds.length>20||input.evidenceIds.some(id=>typeof id!=='string'))fail(400,'INVALID_EVIDENCE','Select at most 20 evidence IDs');const ids=new Set(input.evidenceIds as string[]);const evidence=(await store.evidence(id.toLowerCase()) as {id:string}[]).filter(record=>ids.has(record.id));if(!evidence.length||evidence.length!==ids.size)fail(400,'INVALID_EVIDENCE','Select existing evidence records');return json(await analyzeDispute({settlement:await chain.settlement(id,true),evidence}));}
   match=path.match(/^\/disputes\/(0x[a-fA-F0-9]{64})\/evidence$/);
   if(match&&(req.method==='POST'||req.method==='GET')){
-   const id=hex(match[1],32),who=await actor(req);await chain.authorizeEvidence(id,who);
+   const id=hex(match[1],32),who=await actor(req);await authorizeEvidence(id,who);
    if(req.method==='GET')return json({items:await store.evidence(id.toLowerCase()),limit:100});
    const input=await body(req);if(typeof input.content!=='string'||!input.content.trim()||new TextEncoder().encode(input.content).length>16384)fail(400,'INVALID_EVIDENCE','content must be nonempty UTF-8 text of at most 16 KiB');
    const hash=keccak256(toHex(input.content));await store.addEvidence({id:hash,settlement_id:id.toLowerCase(),author:who.toLowerCase(),content:input.content,created_at:new Date(clock()).toISOString()});
@@ -102,6 +109,7 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
   }
   if(path==='/receipts'&&req.method==='GET'){
    const who=await actor(req),{limit,offset}=page(url),selected=url.searchParams.get('wallet');let wallet:string|undefined,provider:string|undefined=who;
+   if(url.searchParams.has('provider')){const requested=address(url.searchParams.get('provider'));if(requested.toLowerCase()!==who.toLowerCase()&&(!hosted||!await hosted.ownsProvider(who,requested)))fail(403,'FORBIDDEN','Only the provider or its hosted API owner can access these receipts');provider=requested;}
    if(selected){wallet=address(selected);const state=await chain.wallet(wallet as Address);if(state.owner.toLowerCase()===who.toLowerCase())provider=undefined;}
    const records=await store.receipts(wallet,provider,limit,offset),items=[];
    for(const record of records){if(record.receipt.chainId===config.chainId&&(!wallet||record.receipt.wallet.toLowerCase()===wallet.toLowerCase())&&(!provider||record.receipt.provider.toLowerCase()===provider.toLowerCase())&&await verifyReceipt(record.receipt))items.push({...record,verified:true});}
@@ -111,7 +119,7 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    const who=await actor(req),id=hex(path.split('/')[2],32),record=await store.receipt(id);
    if(!record)fail(404,'RECEIPT_NOT_FOUND','No stored signed receipt');
    const wallet=await chain.wallet(record.receipt.wallet);
-   if(![wallet.owner.toLowerCase(),record.receipt.provider.toLowerCase()].includes(who.toLowerCase()))fail(403,'FORBIDDEN','Only the wallet owner or provider may read this receipt');
+   if(![wallet.owner.toLowerCase(),record.receipt.provider.toLowerCase()].includes(who.toLowerCase())&&(!hosted||!await hosted.ownsProvider(who,record.receipt.provider)))fail(403,'FORBIDDEN','Only the wallet owner or provider may read this receipt');
    if(record.receipt.chainId!==config.chainId||record.receipt.receipt.voucherHash!==id||!await verifyReceipt(record.receipt))fail(502,'INVALID_STORED_RECEIPT','Stored receipt failed verification');
    return json({...record,receiptHash:receiptHash(record.receipt),verified:true});
   }
@@ -123,14 +131,14 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    if(origin&&origin!==config.authOrigin)fail(403,'ORIGIN_DENIED','Origin is not allowed');
    rate('all:'+ip,120);
    const url=new URL(req.url);if(url.pathname.startsWith('/auth/'))rate('auth:'+ip,20);
-   if(req.method==='OPTIONS')response=new Response(null,{status:204,headers:{'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'600'}});
+   if(req.method==='OPTIONS')response=new Response(null,{status:204,headers:{'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type, X-AgentPay-Voucher, X-AgentPay-Version','Access-Control-Max-Age':'600'}});
    else response=await route(req,url);
   }catch(error){
    const known=apiError(error);
    if(known)response=json({error:{code:known.code,message:known.message}},known.status);
    else response=json({error:{code:'UPSTREAM_FAILURE',message:'The data source could not complete this request'}},502);
   }
-  response.headers.set('Vary','Origin');response.headers.set('Cache-Control','no-store');response.headers.set('X-Content-Type-Options','nosniff');
+  response.headers.set('Vary','Origin');response.headers.set('Cache-Control','no-store');response.headers.set('X-Content-Type-Options','nosniff');response.headers.set('Access-Control-Expose-Headers','X-AgentPay-Quote, X-AgentPay-Receipt');
   if(origin===config.authOrigin)response.headers.set('Access-Control-Allow-Origin',origin);
   if(response.status===429)response.headers.set('Retry-After','60');
   return response;

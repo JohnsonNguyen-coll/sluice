@@ -32,6 +32,7 @@ import { WalletHub } from "./wallet-hub";
 import { AgentProfile } from "./agent-profile";
 import {ArbitrationConsent,NegotiationActions,DisputeAssistant,type NegotiationState} from "./negotiation";
 import { ProviderListings } from "./api-directory";
+import {ManagedServices,HostedDisputeActions} from "./managed-services";
 import { WalletControl } from "./wallet-control";
 import {
   Button,
@@ -1244,6 +1245,7 @@ function DisputePanel({ record }: { record: string }) {
             </Card>
           )}
           {d && negotiated && vaultAddress && <NegotiationActions key={record+address} id={h32(record)} vault={vaultAddress} provider={s.provider} token={s.token} amount={d.amount} owner={ownsWallet} deadline={d.responseDeadline} arbiterDeadline={d.arbiterDeadline} arbiter={s.arbiter} responded={d.providerResponded} resolved={d.resolved} now={now} state={details.value?.negotiation} execute={tx.execute} write={tx.write} busy={tx.busy}/>}
+          {d && <HostedDisputeActions key={record+sessionAddress} id={record} amount={d.amount} resolved={d.resolved} negotiated={negotiated} proposal={details.value?.negotiation?.proposal}/>}
           {d && (ownsWallet||address?.toLowerCase()===s.provider.toLowerCase()||address?.toLowerCase()===s.arbiter.toLowerCase()) && <DisputeAssistant key={record+sessionAddress} id={record}/>}
           <Card>
             <h2>Payment actions</h2>{d?.resolved && <p>This payment is finalized. No further resolution is required.</p>}
@@ -1685,8 +1687,13 @@ export function LiveWorkspace({
       )}{" "}
       {id === "provider" && (
         <>
-          <ProviderPanel />
-          <ProviderListings />
+          <ManagedServices />
+          <details className="workspace-disclosure">
+            <summary>Already run your own API? Set up a self-hosted provider</summary>
+            <p>Use your own server and middleware instead of Sluice hosting.</p>
+            <ProviderPanel />
+            <ProviderListings />
+          </details>
         </>
       )}
       {id === "provider-settlements" && (
