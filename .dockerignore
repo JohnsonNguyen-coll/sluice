@@ -1,0 +1,14 @@
+.git
+.agents
+.codex
+.tools
+node_modules
+**/node_modules
+.next
+**/.next
+coverage
+**/.env
+**/.env.*
+contract/out
+contract/cache
+contract/broadcast
