@@ -31,10 +31,13 @@ import {
   voucherData,
   voucherHash,
   authorizationData,
+  parsePolicyAuthorization,
+  verifyPolicyAuthorization,
   readBounded,
   type Version,
   type SignedVoucher,
   type SignedReceipt,
+  type PolicyAuthorization,
 } from "./protocol";
 
 export type PaymentPolicy = {
@@ -60,6 +63,9 @@ export type ClientOptions = {
   vault?: Address;
   store?: AgentStore;
   policy: PaymentPolicy;
+  /** Optional policy authority. Configure this for providers which require a
+   * server-verified daily-spend reservation before they serve a request. */
+  policyAuthority?: { url: string; signer: Address };
   fetch?: typeof fetch;
   now?: () => number;
   requestTimeoutMs?: number;
@@ -133,6 +139,7 @@ export class AgentPayClient {
       token: Address;
       price: string;
       version: Version;
+      policy?: { signer?: Address; url?: string };
     };
     address(quote.provider);
     address(quote.token);
@@ -157,6 +164,21 @@ export class AgentPayClient {
     const version = detectedVersion;
     if (quote.version !== version)
       throw Error("Provider does not support this wallet version");
+    let policyAuthority = this.options.policyAuthority;
+    if (quote.policy?.signer) {
+      address(quote.policy.signer);
+      if (policyAuthority && policyAuthority.signer.toLowerCase() !== quote.policy.signer.toLowerCase())
+        throw Error("Provider policy authority does not match the configured authority");
+      if (!policyAuthority) {
+        if (!quote.policy.url) throw Error("Provider requires a policy authority but did not advertise one");
+        const authorityUrl = new URL(quote.policy.url);
+        // Hosted Sluice APIs use their own origin for the authority. Do not
+        // let an API quote redirect an agent to a third-party ticket service.
+        if (authorityUrl.origin !== new URL(request.url).origin)
+          throw Error("Provider policy authority must use the API origin");
+        policyAuthority = { url: authorityUrl.toString(), signer: quote.policy.signer };
+      }
+    }
     await this.checkProfile(
       quote.provider,
       request.url,
@@ -241,6 +263,38 @@ export class AgentPayClient {
       try {
         const headers = new Headers(request.headers);
         headers.set("X-AgentPay-Voucher", pack(voucher));
+        if (policyAuthority) {
+          const policyResponse = await this.transport(
+            new Request(policyAuthority.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ voucher, amount: quote.price }),
+              signal: AbortSignal.timeout(this.options.requestTimeoutMs ?? 15000),
+            }),
+          );
+          if (!policyResponse.ok)
+            throw Error("Policy authority denied this payment");
+          const body = (await policyResponse.json()) as {
+            authorization?: PolicyAuthorization;
+          };
+          const authorization = parsePolicyAuthorization(body.authorization);
+          if (
+            authorization.voucherHash.toLowerCase() !== id.toLowerCase() ||
+            authorization.requestHash.toLowerCase() !== voucher.requestHash.toLowerCase() ||
+            authorization.wallet.toLowerCase() !== voucher.wallet.toLowerCase() ||
+            authorization.provider.toLowerCase() !== voucher.provider.toLowerCase() ||
+            authorization.token.toLowerCase() !== voucher.token.toLowerCase() ||
+            authorization.amount !== quote.price ||
+            BigInt(authorization.expiry) < BigInt(this.now()) ||
+            !(await verifyPolicyAuthorization(
+              authorization,
+              policyAuthority.signer,
+              this.options.chainId,
+            ))
+          )
+            throw Error("Invalid policy authorization");
+          headers.set("X-Sluice-Policy", pack(authorization));
+        }
         response = await this.transport(new Request(request, { headers }), {
           redirect: "error",
           signal: AbortSignal.any([

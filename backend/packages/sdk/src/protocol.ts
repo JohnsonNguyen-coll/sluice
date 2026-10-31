@@ -26,6 +26,35 @@ export type SignedVoucher = Voucher & {
   requestHash: Hex;
   requestSignature?: Hex;
 };
+/**
+ * A short-lived authorization issued by Sluice's policy authority.  It binds a
+ * particular voucher and HTTP request to the per-wallet spend reservation made
+ * by the authority.  Providers can verify this signature without trusting the
+ * agent to report its own remaining daily allowance.
+ */
+export type PolicyAuthorization = {
+  voucherHash: Hex;
+  requestHash: Hex;
+  wallet: Address;
+  provider: Address;
+  token: Address;
+  amount: string;
+  day: string;
+  expiry: string;
+  signature: Hex;
+};
+export const policyAuthorizationTypes = {
+  PolicyAuthorization: [
+    { name: "voucherHash", type: "bytes32" },
+    { name: "requestHash", type: "bytes32" },
+    { name: "wallet", type: "address" },
+    { name: "provider", type: "address" },
+    { name: "token", type: "address" },
+    { name: "amount", type: "uint256" },
+    { name: "day", type: "uint64" },
+    { name: "expiry", type: "uint64" },
+  ],
+} as const;
 export type Receipt = {
   voucherHash: Hex;
   requestHash: Hex;
@@ -105,6 +134,27 @@ export function receiptData(value: SignedReceipt) {
 }
 export const voucherHash = (value: SignedVoucher, chainId: number) =>
   hashTypedData(voucherData(value, value.version, chainId));
+export function policyAuthorizationData(
+  value: Omit<PolicyAuthorization, "signature">,
+  chainId: number,
+) {
+  return {
+    domain: {
+      name: "SluicePolicy",
+      version: "1",
+      chainId,
+      verifyingContract: value.wallet,
+    },
+    types: policyAuthorizationTypes,
+    primaryType: "PolicyAuthorization" as const,
+    message: {
+      ...value,
+      amount: BigInt(value.amount),
+      day: BigInt(value.day),
+      expiry: BigInt(value.expiry),
+    },
+  };
+}
 export function authorizationData(value: SignedVoucher, chainId: number) {
   return {
     domain: {
@@ -218,6 +268,40 @@ export function parseVoucher(value: unknown): SignedVoucher {
   uint(v.expiry, 64);
   hash(v.requestHash);
   return v;
+}
+export function parsePolicyAuthorization(value: unknown): PolicyAuthorization {
+  const p = value as PolicyAuthorization;
+  if (
+    !p ||
+    typeof p.signature !== "string" ||
+    !isHex(p.signature) ||
+    p.signature.length !== 132
+  )
+    throw Error("Invalid policy authorization");
+  hash(p.voucherHash);
+  hash(p.requestHash);
+  address(p.wallet);
+  address(p.provider);
+  address(p.token);
+  uint(p.amount);
+  uint(p.day, 64);
+  uint(p.expiry, 64);
+  return p;
+}
+export async function verifyPolicyAuthorization(
+  value: PolicyAuthorization,
+  signer: Address,
+  chainId: number,
+): Promise<boolean> {
+  parsePolicyAuthorization(value);
+  return (
+    (
+      await recoverTypedDataAddress({
+        ...policyAuthorizationData(value, chainId),
+        signature: value.signature,
+      })
+    ).toLowerCase() === signer.toLowerCase()
+  );
 }
 export function parseReceipt(value: unknown): SignedReceipt {
   const v = value as SignedReceipt;

@@ -13,6 +13,8 @@ import {
   parseReceipt,
   voucherData,
   authorizationData,
+  policyAuthorizationData,
+  verifyPolicyAuthorization,
   type SignedReceipt,
   type SignedVoucher,
 } from "../src/protocol";
@@ -21,6 +23,16 @@ import { computeReputation, domainMessage } from "../src/profiles";
 const provider = privateKeyToAccount(("0x" + "33".repeat(32)) as Hex),
   wallet = ("0x" + "44".repeat(20)) as Address,
   token = ("0x" + "55".repeat(20)) as Address;
+test("policy authorizations bind one exact voucher, request and call amount", async () => {
+  const authority = privateKeyToAccount(("0x" + "66".repeat(32)) as Hex);
+  const value = {
+    voucherHash: keccak256(toHex("voucher")), requestHash: keccak256(toHex("request")),
+    wallet, provider: provider.address, token, amount: "10000", day: "20000", expiry: "1728000000",
+  };
+  const signed = { ...value, signature: await authority.signTypedData(policyAuthorizationData(value, 31337)) };
+  expect(await verifyPolicyAuthorization(signed, authority.address, 31337)).toBe(true);
+  expect(await verifyPolicyAuthorization({ ...signed, amount: "10001" }, authority.address, 31337)).toBe(false);
+});
 test("receipts bind provider, wallet, chain and every call field", async () => {
   const value: SignedReceipt = {
     provider: provider.address,

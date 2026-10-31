@@ -24,6 +24,7 @@ type Service = {
   state: "draft" | "active" | "paused";
   published: boolean;
   endpoint: string;
+  x402Endpoint: string;
   registrationTx: Hex | null;
   lastSettlementTx: Hex | null;
   lastWorkerAt: string | null;
@@ -335,7 +336,7 @@ function ManagedServicesEditor() {
           </p>
           <CodeBlock
             code={s.endpoint}
-            filename="API endpoint"
+            filename="AgentPay endpoint"
             language="text"
           />
           <p className="field-help">
@@ -343,6 +344,20 @@ function ManagedServicesEditor() {
             for the request example and payment details. No SDK installation is
             needed to connect an existing API; callers use the agent SDK for
             payment authorization.
+          </p>
+          <CodeBlock
+            code={s.x402Endpoint}
+            filename="x402 v2 · batch-settlement endpoint"
+            language="text"
+          />
+          <p className="field-help">
+            Standard x402 clients POST the same JSON here. The API result is
+            returned to the caller in the paid HTTP response body, after the
+            payment voucher has been verified and committed. This dashboard
+            never publishes or stores that private result. x402 provides
+            interoperable escrow and payment; use the AgentPay endpoint when
+            you also need signed receipts, negotiation and DisputeVault
+            protection.
           </p>
           <div className="live-actions">
             {s.state !== "active" && (

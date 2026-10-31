@@ -1,5 +1,9 @@
 > Provider onboarding now connects existing APIs through the gateway. See [API_GATEWAY.md](API_GATEWAY.md) for the current flow, key handling and per-attempt billing. The utility services below are retained as legacy integrations.
 
+> Managed APIs also expose an x402 v2 `batch-settlement` endpoint. See
+> [X402.md](X402.md) for payment ordering, result delivery, escrow settlement
+> and the boundary between x402 compatibility and AgentPay disputes.
+
 # Hosted APIs on Arc Testnet
 
 The Provider page can create hosted **Text analysis** and **JSON validation** APIs without user-written server code. These are deterministic utilities that compute results from the submitted text. They are not LLM services or resold third-party model APIs.

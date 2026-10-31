@@ -1,5 +1,6 @@
 import { upstreamConfig, sealUpstream, openUpstream, gatewayInput, callUpstream, type Upstream } from "./api-gateway";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import {
   createPublicClient,
   createWalletClient,
@@ -35,6 +36,8 @@ import {
   runManagedTool,
 } from "./managed-tools";
 import { type ManagedStore, type ManagedService } from "./managed-store";
+import { X402Gateway } from "./x402-gateway";
+import { PolicyAuthority } from "./policy-authority";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -55,6 +58,7 @@ export interface HostedApi {
     input: Record<string, unknown>,
   ): Promise<unknown>;
   serve(id: string, req: Request): Promise<Response>;
+  serveX402(id: string, req: Request): Promise<Response>;
   start(): () => Promise<void>;
 }
 export class ManagedHost implements HostedApi {
@@ -62,8 +66,10 @@ export class ManagedHost implements HostedApi {
   private token: Address;
   private base: string;
   private busy = new Set<string>();
+  private x402Gateways = new Map<string, Promise<X402Gateway>>();
   private closing = false;
   private tasks = new Set<Promise<unknown>>();
+  private policyAuthority?: PolicyAuthority;
   constructor(
     private config: Config,
     private store: ManagedStore,
@@ -103,6 +109,7 @@ export class ManagedHost implements HostedApi {
     )
       throw Error("MANAGED_API_BASE_URL must be an HTTPS origin or localhost");
     this.base = url.origin;
+    if (config.policyAuthorityKey) this.policyAuthority = new PolicyAuthority(config);
   }
   capabilities() {
     let configured = false;
@@ -160,6 +167,44 @@ export class ManagedHost implements HostedApi {
       transport: publicRpcTransport(this.config.rpcUrls, this.config.chainId),
     });
   }
+  private x402(s: ManagedService) {
+    const cached = this.x402Gateways.get(s.id);
+    if (cached) return cached;
+    const account = this.account(s), wallet = this.wallet(s), client = this.client;
+    const gateway = X402Gateway.create({
+      network: `eip155:${this.config.chainId}`,
+      receiver: address(s.owner),
+      token: this.token,
+      price: s.price,
+      resourceUrl: this.base + "/x402/" + s.id,
+      serviceName: s.name,
+      storageDirectory: resolve(import.meta.dir, "../../.tools/x402", s.id),
+      receiverAuthorizerSigner: account,
+      facilitatorSigner: {
+        address: account.address,
+        readContract: (args) => client.readContract(args as never),
+        verifyTypedData: (args) => client.verifyTypedData(args as never),
+        writeContract: (args) => wallet.writeContract({
+          ...args,
+          account,
+          chain: null,
+        } as never),
+        sendTransaction: (args) => wallet.sendTransaction({
+          ...args,
+          account,
+          chain: null,
+        } as never),
+        waitForTransactionReceipt: (args) =>
+          client.waitForTransactionReceipt(args as never),
+        getCode: (args) => client.getCode(args),
+      },
+    }).catch((error) => {
+      this.x402Gateways.delete(s.id);
+      throw error;
+    });
+    this.x402Gateways.set(s.id, gateway);
+    return gateway;
+  }
   private async get(id: string) {
     this.ready();
     if (!uuid.test(id)) fail(400, "INVALID_SERVICE", "Invalid hosted API ID");
@@ -187,6 +232,7 @@ export class ManagedHost implements HostedApi {
       state: s.state,
       published: s.published,
       endpoint: this.base + "/hosted/" + s.id,
+      x402Endpoint: this.base + "/x402/" + s.id,
       token: this.token,
       decimals: 6,
       registrationTx: s.registration_tx || null,
@@ -323,6 +369,17 @@ export class ManagedHost implements HostedApi {
       store: this.providers,
       versions: [3],
       vault: this.config.disputeVault,
+      // Managed APIs never serve a paid response unless the authority reserved
+      // the wallet's current-day allowance for this exact voucher.
+      policySigner: this.config.policyAuthoritySigner,
+      policyAuthorityUrl: this.config.policyAuthoritySigner
+        ? this.base + "/policy/authorize"
+        : undefined,
+      onSettled: async (records) => {
+        await this.policyAuthority?.release(records.flatMap((record) =>
+          record.policyAuthorization ? [record.policyAuthorization.voucherHash] : [],
+        ));
+      },
     });
   }
   // Every on-chain operation shares a persistent per-provider lease. A crash or
@@ -609,6 +666,12 @@ export class ManagedHost implements HostedApi {
         operator: "Sluice",
         state: s.state,
         payment: "HTTP 402 + AgentPay signed voucher; signed receipt returned",
+        x402: {
+          endpoint: this.base + "/x402/" + s.id,
+          version: 2,
+          scheme: "batch-settlement",
+          responseDelivery: "The JSON result is returned in the paid HTTP response body only after payment is accepted.",
+        },
       });
     if (req.method !== "POST")
       return Response.json(
@@ -649,6 +712,47 @@ export class ManagedHost implements HostedApi {
       upstream ? callUpstream(upstream, input, "sluice-" + context.voucherHash) : Response.json(runManagedTool(s.kind, input)),
     )(req);
   }
+  async serveX402(id: string, req: Request) {
+    const s = await this.get(id);
+    if (req.method === "GET")
+      return Response.json({
+        name: s.name,
+        method: "POST",
+        protocol: "x402 v2",
+        scheme: "batch-settlement",
+        network: `eip155:${this.config.chainId}`,
+        token: this.token,
+        priceUsdcBaseUnits: s.price,
+        result: "Returned as the paid HTTP response body after the voucher is committed.",
+        safety: "No successful upstream result is released when payment verification or commitment fails.",
+      });
+    if (req.method !== "POST")
+      return Response.json(
+        { error: "Use POST for paid x402 calls; GET shows documentation" },
+        { status: 405, headers: { Allow: "GET, POST" } },
+      );
+    if (s.state !== "active" || s.worker_error)
+      fail(503, "SERVICE_UNAVAILABLE", "This hosted API is not accepting paid calls");
+    const input = await body(req.clone());
+    const upstream = s.kind === "http-proxy" ? this.upstream(s) : null;
+    if (upstream) gatewayInput(upstream, input);
+    else runManagedTool(s.kind, input);
+    if ((await this.client.getBalance({ address: address(s.provider) })) < parseEther("0.01"))
+      fail(503, "PROVIDER_GAS_REQUIRED", "Provider needs gas before accepting more paid calls");
+    const registered = (await this.chain.provider(address(s.provider))) as { entry: { active: boolean } };
+    if (!registered.entry.active)
+      fail(503, "PROVIDER_INACTIVE", "Provider is not active");
+
+    // One persistent provider lease prevents x402 facilitator transactions from
+    // racing AgentPay settlement or a second backend process using the same key.
+    return this.exclusive(s, async () =>
+      (await this.x402(s)).handle(req, input, () =>
+        upstream
+          ? callUpstream(upstream, input, "sluice-x402-" + randomUUID())
+          : Promise.resolve(Response.json(runManagedTool(s.kind, input))),
+      ),
+    );
+  }
   async tick() {
     if (this.closing) return;
     this.ready();
@@ -658,7 +762,9 @@ export class ManagedHost implements HostedApi {
         continue;
       try {
         const pending = await this.providers.pending(undefined, s.provider);
-        if (!pending.length) {
+        const x402 = await this.x402(s);
+        const x402Pending = await x402.hasClaimableVouchers();
+        if (!pending.length && !x402Pending) {
           await this.store.update(s.id, {
             last_worker_at: new Date().toISOString(),
           });
@@ -666,7 +772,10 @@ export class ManagedHost implements HostedApi {
         }
         await this.exclusive(s, async (sending) => {
           sending();
-          const hashes = await this.payments(s).settle();
+          const hashes = [
+            ...(pending.length ? await this.payments(s).settle() : []),
+            ...(x402Pending ? await x402.claimAndSettle() : []),
+          ];
           await this.store.update(s.id, {
             last_worker_at: new Date().toISOString(),
             ...(hashes.length ? { last_settlement_tx: hashes.at(-1) } : {}),

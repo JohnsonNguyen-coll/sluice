@@ -4,7 +4,7 @@ SDK and middleware are private TypeScript workspaces under `backend/packages/`. 
 
 ## Run the application
 
-1. Copy `backend/.env.example` to `backend/.env`, fill Supabase URL and server-only legacy service-role key, and apply both SQL files in `backend/supabase/migrations/` in order.
+1. Copy `backend/.env.example` to `backend/.env`, fill Supabase URL and server-only legacy service-role key, and apply all SQL files in `backend/supabase/migrations/` in order. For provider-enforced daily spending, set a dedicated `POLICY_AUTHORITY_PRIVATE_KEY` and apply `202610310007_policy_reservations.sql`.
 2. Run `bun run backend:dev` (port 3001), then `bun run dev --port 3010`. Set AUTH_ORIGIN to the exact frontend origin and NEXT_PUBLIC_API_URL if the backend runs elsewhere.
 3. Read `/config` for active contract addresses and current/historical factories. `/health` checks RPC plus both private storage schemas; it does not prove payment correctness.
 4. In the dashboard, connect a browser wallet on Arc Testnet. Create an agent wallet using a separate agent signing address, deposit USDC and set a provider budget. Only the owner signs these transactions.
@@ -27,6 +27,7 @@ const payments = new PaymentProvider({
   factories, // from your trusted deployment manifest, not a caller-supplied address
   store: new SupabaseProviderStore(supabaseUrl, serviceRoleKey),
   vault: disputeVault,
+  policySigner: policyAuthorityAddress,
 });
 
 Bun.serve({ hostname: '127.0.0.1', port: 3002,
@@ -69,6 +70,10 @@ const agent = new AgentPayClient({
     maxPerCall: 10_000n, requireRegisteredProvider: true,
     maxDisputeWindow: 3600,
   },
+  policyAuthority: {
+    url: 'https://api.sluice.example/policy/authorize',
+    signer: policyAuthorityAddress,
+  },
 });
 const response = await agent.fetch('https://provider.example/answer', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -77,6 +82,10 @@ const response = await agent.fetch('https://provider.example/answer', {
 ```
 
 `IndexedDBAgentStore` supports browser persistence and transactional channel compare-and-swap. `FileAgentStore` uses atomic replacement and a bounded filesystem lock for Node/Bun. `MemoryAgentStore` is for tests or short-lived experiments: do not reset signed authorization history in a live agent. Multiple independent stores/signers for one channel can conflict. The SDK serializes each channel and persists reservations before transmitting signatures.
+
+### Enforced daily spending
+
+The on-chain `dailyLimitUsdE6` remains the final settlement ceiling. A cumulative voucher alone cannot safely prove which individual calls belong to a given day, so Sluice's production path adds a signed policy reservation before a provider runs its handler. The policy authority verifies the current agent signer and wallet state, atomically reserves the call's USD value in Supabase, and signs a short-lived ticket bound to the voucher hash, exact HTTP request hash, token and price. A provider configured with `policySigner` rejects a voucher without that ticket; it therefore cannot return paid data merely because it received an agent signature. This is an explicit Sluice service trust boundary, not a claim of fully trustless pre-authorization for providers that choose not to use middleware.
 
 Non-2xx responses and optional `validateResponse` schema failures are flagged in the local call store. `flagCall(voucherHash, reason)` adds another dispute candidate. A missing/invalid receipt or network failure keeps the authorization pending; retry the identical request. `reconcile(provider, token)` clears that pending state only when chain state confirms it was settled. It does not silently cancel a signature or promise a refund.
 

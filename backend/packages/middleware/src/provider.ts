@@ -19,6 +19,8 @@ import {
   voucherHash,
   voucherData,
   authorizationData,
+  parsePolicyAuthorization,
+  verifyPolicyAuthorization,
   receiptData,
   receiptLeaf,
   merkleTree,
@@ -60,6 +62,11 @@ export type ProviderOptions = {
   settleThreshold?: bigint;
   vault?: Address;
   autoAcceptBelow?: bigint;
+  /** When configured, no response is served without a signed policy ticket.
+   * This is the provider-side enforcement point for off-chain daily limits. */
+  policySigner?: Address;
+  /** Public authority endpoint advertised to compatible agent SDKs. */
+  policyAuthorityUrl?: string;
   now?: () => number;
   onDispute?: (input: {
     id: Hex;
@@ -67,6 +74,7 @@ export type ProviderOptions = {
   }) => Promise<
     { action: "accept" } | { action: "respond"; evidenceHash: Hex } | void
   >;
+  onSettled?: (records: readonly ProviderRecord[]) => Promise<void> | void;
 };
 const body64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 const cached = (r: StoredResponse, receipt?: SignedReceipt) => {
@@ -126,7 +134,7 @@ export class PaymentProvider {
           headers: {
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers":
-              "Content-Type, X-AgentPay-Voucher, X-AgentPay-Version",
+              "Content-Type, X-AgentPay-Voucher, X-AgentPay-Version, X-Sluice-Policy",
             "Access-Control-Expose-Headers": "X-AgentPay-Receipt",
           },
         });
@@ -146,6 +154,9 @@ export class PaymentProvider {
           token: this.options.token,
           price: String(this.options.price),
           version: requested,
+          ...(this.options.policySigner
+            ? { policy: { signer: this.options.policySigner, url: this.options.policyAuthorityUrl } }
+            : {}),
         };
         return Response.json(quote, {
           status: 402,
@@ -157,6 +168,7 @@ export class PaymentProvider {
         });
       }
       try {
+        let policyAuthorization: import("@sluice/sdk").PolicyAuthorization | undefined;
         const voucher = parseVoucher(unpack<SignedVoucher>(header));
         if (
           voucher.version !== requested ||
@@ -198,6 +210,27 @@ export class PaymentProvider {
         if (validUntil < BigInt(this.now()) || validUntil === 0n)
           throw Error("Unauthorized voucher signer");
         const id = voucherHash(voucher, this.options.chainId);
+        if (this.options.policySigner) {
+          const policyHeader = request.headers.get("X-Sluice-Policy");
+          if (!policyHeader) throw Error("Policy authorization required");
+          const policy = parsePolicyAuthorization(unpack(policyHeader));
+          if (
+            policy.voucherHash.toLowerCase() !== id.toLowerCase() ||
+            policy.requestHash.toLowerCase() !== voucher.requestHash.toLowerCase() ||
+            policy.wallet.toLowerCase() !== voucher.wallet.toLowerCase() ||
+            policy.provider.toLowerCase() !== voucher.provider.toLowerCase() ||
+            policy.token.toLowerCase() !== voucher.token.toLowerCase() ||
+            policy.amount !== String(this.options.price) ||
+            BigInt(policy.expiry) < BigInt(this.now()) ||
+            !(await verifyPolicyAuthorization(
+              policy,
+              this.options.policySigner,
+              this.options.chainId,
+            ))
+          )
+            throw Error("Invalid policy authorization");
+          policyAuthorization = policy;
+        }
         const existing = await this.options.store.get(id);
         if (existing) {
           if (!voucher.requestSignature)
@@ -233,7 +266,7 @@ export class PaymentProvider {
         ]
           .join(":")
           .toLowerCase();
-        const record: ProviderRecord = { id, channel, voucher };
+        const record: ProviderRecord = { id, channel, voucher, ...(policyAuthorization ? { policyAuthorization } : {}) };
         const accepted = await this.options.store.accept(
           record,
           { nonce: String(state.nonce), amount: String(state.settled) },
@@ -443,6 +476,7 @@ export class PaymentProvider {
           receipt.transactionHash,
           commitments,
         );
+        await this.options.onSettled?.(fresh);
         settled.push(receipt.transactionHash);
       }
       return settled;

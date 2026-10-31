@@ -1,4 +1,4 @@
-import type { SignedReceipt, SignedVoucher } from "@sluice/sdk";
+import type { PolicyAuthorization, SignedReceipt, SignedVoucher } from "@sluice/sdk";
 export type StoredResponse = {
   status: number;
   headers: [string, string][];
@@ -15,6 +15,7 @@ export type ProviderRecord = {
   id: string;
   channel: string;
   voucher: SignedVoucher;
+  policyAuthorization?: PolicyAuthorization;
   receipt?: SignedReceipt;
   response?: StoredResponse;
   settledTx?: string;
