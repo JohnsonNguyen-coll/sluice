@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID, createHash } from "node:crypto";
 import type { Address, PublicClient } from "viem";
-import { MemoryProviderStore } from "@sluice/middleware";
+import { MemoryProviderStore, type ProviderStore } from "@sluice/middleware";
 import { ManagedHost } from "../src/managed-host";
 import {
   type ManagedStore,
@@ -52,7 +52,7 @@ class MemoryManaged implements ManagedStore {
     if (this.leases.get(id) === holder) this.leases.delete(id);
   }
 }
-function setup() {
+function setup(providers: ProviderStore = new MemoryProviderStore()) {
   const config = loadConfig({
       SUPABASE_URL: "https://storage.example",
       SUPABASE_SERVICE_ROLE_KEY: "test-only",
@@ -95,7 +95,7 @@ function setup() {
     catalog,
     chain,
     { MANAGED_PROVIDER_ENCRYPTION_KEY: "aa".repeat(32) },
-    new MemoryProviderStore(),
+    providers,
     client,
   );
   return { host, store, config, chain, catalog };
@@ -108,6 +108,17 @@ const input = {
   published: false,
   acceptHostedCustody: true,
 };
+test("temporary worker read failure retries later without freezing the API", async () => {
+  const providers = new (class extends MemoryProviderStore {
+    async pending(): Promise<never> { throw Error("temporary database outage"); }
+  })();
+  const { host, store } = setup(providers);
+  const created = await host.create(owner, input) as { service: { id: string } };
+  await store.update(created.service.id, { state: "active" });
+  await host.tick();
+  expect((await store.get(created.service.id))?.worker_error).toBeUndefined();
+  expect(store.leases.size).toBe(0);
+});
 test("provider encryption is randomized, authenticated and bound to chain/service/owner", () => {
   const key = Buffer.alloc(32, 7),
     secret = ("0x" + "33".repeat(32)) as `0x${string}`,

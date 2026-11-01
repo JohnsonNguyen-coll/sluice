@@ -69,6 +69,13 @@ test('expired challenge cannot issue a session',async()=>{
  const id=crypto.randomUUID();await store.putChallenge({id,address:account.address.toLowerCase(),message:'expired',expires_at:new Date(0).toISOString()});
  expect(await store.consumeChallenge(id,'d'.repeat(64))).toBe(false);
 });
+test('healthcheck fails deployment readiness when storage or RPC is down',async()=>{
+ const failedStore=Object.create(store) as Store;
+ failedStore.health=async()=>{throw Error('database offline');};
+ const response=await createApi(config,failedStore,new TestChain(config))(new Request('http://localhost:3001/health'),'tests');
+ expect(response.status).toBe(503);
+ expect((await response.json()).status).toBe('degraded');
+});
 test('bearer sessions are hashed, expire, and can be revoked',async()=>{
  const {token}=await login();expect((await request('/auth/me','GET',undefined,token)).status).toBe(200);
  const rows=(await db.query<{token_hash:string}>('select token_hash from api_sessions')).rows;expect(rows.some(r=>r.token_hash===token)).toBe(false);

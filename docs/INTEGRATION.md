@@ -150,7 +150,7 @@ cd contract
 bun --env-file=../backend/.env --env-file=.env run scripts/phase3-testnet-e2e.ts
 ```
 
-The silence and arbiter-timeout scenarios preserve actual 3-day deadlines. Until their recorded readyAt times pass and transactions confirm, they remain pending rather than reported as completed.
+The silence and arbiter-timeout scenarios preserved actual 3-day deadlines. Both resolution transactions were confirmed after those deadlines on 2026-11-01; hashes are in `contract/deployments/phase3-testnet-e2e.json`.
 
 ## Negotiation-first wallets
 

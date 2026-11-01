@@ -94,3 +94,19 @@ database privileges. A read-only real HTTPS request through the pinned transport
 returned GitHub repository JSON, and the applied Supabase columns were verified.
 This does not establish compatibility with a provider's private API/key; run that
 connection's real test in the UI. No new paid gateway transaction is claimed here.
+
+## Arc Testnet follow-up (2026-11-01)
+
+`contract/scripts/gateway-testnet-e2e.ts` connected to the public, read-only
+GitHub repository API through the encrypted gateway configuration. Its connection
+test returned 200; an unpaid call returned 402; the paid AgentPay call returned
+the upstream JSON, produced a verified signed receipt and settled automatically.
+The test service was paused afterward. Public transaction and state evidence is
+in `contract/deployments/gateway-testnet-e2e.json`.
+
+This test has no upstream credential. Credential forwarding, rotation and
+redaction are covered by isolated tests, but a paid call against a private
+provider API with a scoped real key remains to be verified by that provider.
+The test also exposed an ambiguous SQL column in policy reservations, fixed by
+`202611010010_policy_reservation_ambiguity.sql`; the migration has a PostgreSQL
+regression test and was applied before the paid call succeeded.

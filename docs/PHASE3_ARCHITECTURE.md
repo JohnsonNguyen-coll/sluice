@@ -71,4 +71,4 @@ Authority is explicit: factory registration does not grant a wallet arbitrary re
 
 The API handles reads, SIWE sessions, authorization queues and private evidence/receipts. It does not hold owner/provider signing keys or submit user transactions. Browser actions use injected-wallet signing, simulate before requesting a transaction and wait for confirmation. Local agent stores preserve issued authorizations; provider stores preserve the exact-price channel head before execution. A signature is not a reservation and neither HTTP intake nor a healthy API guarantees future settlement.
 
-See INTEGRATION.md for wire hashes/typed-data domains and RUNBOOK.md for failure recovery. Deployment manifests distinguish real Arc transactions from local Anvil time-travel tests. Real deadline scenarios remain pending until actual chain time permits them.
+See INTEGRATION.md for wire hashes/typed-data domains and RUNBOOK.md for failure recovery. Deployment manifests distinguish real Arc transactions from local Anvil time-travel tests. The real deadline scenarios resolved after actual chain time elapsed on 2026-11-01.

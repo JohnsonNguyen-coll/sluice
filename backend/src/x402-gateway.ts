@@ -21,6 +21,8 @@ import {
 } from "@x402/evm/batch-settlement/server";
 import { FileChannelStorage } from "@x402/evm/batch-settlement/server/file-storage";
 import type { Address } from "viem";
+import { join } from "node:path";
+import { FilePendingSettlementStore } from "./x402-pending-store";
 
 type FacilitatorSignerInput = Parameters<typeof toFacilitatorEvmSigner>[0];
 
@@ -93,7 +95,7 @@ export type X402GatewayOptions = {
 /**
  * A self-contained x402 v2 batch-settlement resource server for one hosted API.
  * The local facilitator submits Arc transactions with the managed provider key;
- * channel state is persisted with cross-process file locking instead of memory.
+ * channel and pending-deposit state are persisted on the same volume.
  */
 export class X402Gateway {
   private constructor(
@@ -111,7 +113,11 @@ export class X402Gateway {
     );
     const facilitator = new x402Facilitator().register(
       options.network,
-      new BatchFacilitatorScheme(facilitatorSigner),
+      new BatchFacilitatorScheme(facilitatorSigner, undefined, {
+        pendingSettlementStore: new FilePendingSettlementStore(
+          join(options.storageDirectory, "pending-deposits"),
+        ),
+      }),
     );
     const client = new LocalFacilitatorClient(facilitator);
     const scheme = new BatchServerScheme(options.receiver, {

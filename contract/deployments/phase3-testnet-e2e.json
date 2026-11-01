@@ -34,12 +34,13 @@
     },
     "silent": {
       "voucherId": "0xc841a6da1b9de36128ee5d6d0152843e68002522d141411ea436fe6b45f4dbe8",
-      "status": "waiting for on-chain deadline",
+      "status": "passed",
       "settlementId": "0x7a75eb36bb7adf591f5de6a9142b0c86c1862d9e03e08bc1cbd75ecc0789da3a",
       "settleTx": "0x903e155e08fdae81779689136cbad7e81c682836c830399744c1271302bf7790",
       "openTx": "0x5312cd01d635434286779fc5f7458940382312cc79d998d633379c23ad803a67",
       "readyAt": "1793529084",
-      "undisputedReleaseTx": "0x3016877caa32df0f49ba14e6d836da89af8dc15e93753f4da64bdd65b1e40db2"
+      "undisputedReleaseTx": "0x3016877caa32df0f49ba14e6d836da89af8dc15e93753f4da64bdd65b1e40db2",
+      "resolveTx": "0xac29fe70fbd5b55c7f56b3462d5261788142deed6102a8a9a2ce6ee20597ed3d"
     },
     "split": {
       "voucherId": "0x113a6e7ef718f40dde444112d9a22285225df321c6b8b5e06307059c27af8864",
@@ -52,15 +53,16 @@
     },
     "timeout": {
       "voucherId": "0x5e1547ca15f0b182e993fb3e47e6f22476c1fb54844d789ae6cf70f99635e900",
-      "status": "waiting for on-chain deadline",
+      "status": "passed",
       "settlementId": "0x3fdf0afc41dd90afde730ce0dd5eac812776dee2af6dc3a64c5075570d7c75c6",
       "settleTx": "0x01a809100c22e4c1f975d8bcd3e7627c8b545c13bfdaa67b94cb5ac7ed94afab",
       "openTx": "0x8f9e16cf5ffd838ed30a8a1fd9068c44a2457c855c3a3b96c13c451deadea02e",
       "respondTx": "0xe407d73a23e045a8f4261c105e888ac9b64ebbfadbf5bbfc684f13a1da3fe102",
       "readyAt": "1793529116",
-      "undisputedReleaseTx": "0xd4fbfdacbe96a74c319ef3226bb9eb56d8c3f94a42b51986769d4b63491b6856"
+      "undisputedReleaseTx": "0xd4fbfdacbe96a74c319ef3226bb9eb56d8c3f94a42b51986769d4b63491b6856",
+      "resolveTx": "0x3d8821d8208cac05dc88e54c6e577dce533a87b1d66f0f5d362bc3e82f9bfa85"
     }
   },
-  "updatedAt": "2026-10-29T11:11:15.327Z",
+  "updatedAt": "2026-11-01T14:32:32.448Z",
   "wallet": "0xB83059016958a074B3F7b65B008ea5446dE24CaD"
 }

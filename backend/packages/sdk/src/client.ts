@@ -272,8 +272,13 @@ export class AgentPayClient {
               signal: AbortSignal.timeout(this.options.requestTimeoutMs ?? 15000),
             }),
           );
-          if (!policyResponse.ok)
-            throw Error("Policy authority denied this payment");
+          if (!policyResponse.ok) {
+            const failure = await policyResponse.json().catch(() => null) as { error?: { code?: unknown } } | null;
+            const code = failure?.error?.code;
+            const reason = typeof code === "string" && /^[A-Z][A-Z0-9_]{2,63}$/.test(code)
+              ? code : "POLICY_UNAVAILABLE";
+            throw Error(`Policy authority denied this payment (${reason}, HTTP ${policyResponse.status})`);
+          }
           const body = (await policyResponse.json()) as {
             authorization?: PolicyAuthorization;
           };

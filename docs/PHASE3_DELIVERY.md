@@ -1,6 +1,6 @@
 # Phase 3 delivery — 2026-10-29
 
-The user authorized completing the remaining Phase 3 work and redeploying V1/V2 together with V3. Code/integration and the coordinated testnet deployment are delivered. Two real timeout-resolution transactions remain pending their on-chain deadlines; no future job has been scheduled. This is not an independent security audit or a claim of production certification.
+The user authorized completing the remaining Phase 3 work and redeploying V1/V2 together with V3. Code/integration and the coordinated testnet deployment are delivered. The two real timeout-resolution transactions were confirmed after their on-chain deadlines on 2026-11-01. This is not an independent security audit or a claim of production certification.
 
 ## Delivered
 
@@ -13,8 +13,8 @@ The user authorized completing the remaining Phase 3 work and redeploying V1/V2 
 - [x] Dashboard reads/transactions, identity/provider profiles, private receipts, settlement availability, evidence and deadline actions.
 - [x] Source docs, operational runbook, integration examples and public reference pages updated.
 - [x] Fresh Arc Testnet V1/V2/V3 factories plus registries/vault, runtime/artifact comparison and versioned source/tx manifests.
-- [ ] Real silence-refund resolution after its 3-day deadline.
-- [ ] Real arbiter-timeout resolution after its 3-day deadline.
+- [x] Real silence-refund resolution after its 3-day deadline.
+- [x] Real arbiter-timeout resolution after its 3-day deadline.
 
 ## Validation
 
@@ -52,11 +52,11 @@ Identity/provider setup: [transaction](https://explorer.testnet.arc.io/tx/0x0603
 | --- | --- | --- |
 | clean | passed | [transaction](https://explorer.testnet.arc.io/tx/0xd5ac67fb0aff686a3f7db0dce3f7edf7d7c1c2f7db5e56b49b195c615997ce90), [transaction](https://explorer.testnet.arc.io/tx/0x41b896431299a3e110f02febf0fc89d3abde67da3506f3cd46121bbe7986634c) |
 | accept | passed | [transaction](https://explorer.testnet.arc.io/tx/0xed8286f1fab0868f36963bd87e78441b1bc50b8c038650e48416a4a187b04419), [transaction](https://explorer.testnet.arc.io/tx/0x5e0f0da6a6fbc57fd0af7ef9ea86b3789a7b3958709c3f85671c3e594c149d1a), [transaction](https://explorer.testnet.arc.io/tx/0xd04b9a914fa3113eec5e1173d00f9778b29b6587d87f84797bd7506ea457d94e) |
-| silent | waiting for on-chain deadline — 2026-11-01T10:31:24.000Z | [transaction](https://explorer.testnet.arc.io/tx/0x903e155e08fdae81779689136cbad7e81c682836c830399744c1271302bf7790), [transaction](https://explorer.testnet.arc.io/tx/0x5312cd01d635434286779fc5f7458940382312cc79d998d633379c23ad803a67), [transaction](https://explorer.testnet.arc.io/tx/0x3016877caa32df0f49ba14e6d836da89af8dc15e93753f4da64bdd65b1e40db2) |
+| silent | passed after on-chain deadline | [opening](https://explorer.testnet.arc.io/tx/0x5312cd01d635434286779fc5f7458940382312cc79d998d633379c23ad803a67), [auto refund](https://explorer.testnet.arc.io/tx/0xac29fe70fbd5b55c7f56b3462d5261788142deed6102a8a9a2ce6ee20597ed3d) |
 | split | passed | [transaction](https://explorer.testnet.arc.io/tx/0x6e1a6ab6ef75fdfff0b3924754508234e56212d0febe05da6183e3b47e979fa6), [transaction](https://explorer.testnet.arc.io/tx/0x4c1ba5d16c157ca568131f8534e91fe8e82b0dd57c410835fc73c10a34128d51), [transaction](https://explorer.testnet.arc.io/tx/0x74d09dba1df4626c513e39f35f53e8fbbcf516c6dab2082522bd908b631bde6a), [transaction](https://explorer.testnet.arc.io/tx/0x8b6857b6f40cd4bc6cadbf9a3a2ff59f21e1f253288a570af894e1f2d08ca2c5) |
-| timeout | waiting for on-chain deadline — 2026-11-01T10:31:56.000Z | [transaction](https://explorer.testnet.arc.io/tx/0x01a809100c22e4c1f975d8bcd3e7627c8b545c13bfdaa67b94cb5ac7ed94afab), [transaction](https://explorer.testnet.arc.io/tx/0x8f9e16cf5ffd838ed30a8a1fd9068c44a2457c855c3a3b96c13c451deadea02e), [transaction](https://explorer.testnet.arc.io/tx/0xe407d73a23e045a8f4261c105e888ac9b64ebbfadbf5bbfc684f13a1da3fe102), [transaction](https://explorer.testnet.arc.io/tx/0xd4fbfdacbe96a74c319ef3226bb9eb56d8c3f94a42b51986769d4b63491b6856) |
+| timeout | passed after on-chain deadline | [opening](https://explorer.testnet.arc.io/tx/0x8f9e16cf5ffd838ed30a8a1fd9068c44a2457c855c3a3b96c13c451deadea02e), [arbiter timeout](https://explorer.testnet.arc.io/tx/0x3d8821d8208cac05dc88e54c6e577dce533a87b1d66f0f5d362bc3e82f9bfa85) |
 
-For silence and timeout, the undisputed remainder has already been released. Only disputed principal and its bond remain held. Ready times in Asia/Bangkok: **2026-11-01 17:31:24** (silence) and **17:31:56** (arbiter timeout). Resume the persisted script after those times; do not report them as resolved before a confirming transaction exists.
+For silence and timeout, the undisputed remainder was released separately before the final refund transactions. All five scenarios now have confirmed resolution transactions in `contract/deployments/phase3-testnet-e2e.json`.
 
 ## Resume and operate
 

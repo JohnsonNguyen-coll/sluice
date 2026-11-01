@@ -1,6 +1,6 @@
 # Phase 3 implementation status
 
-Latest dispute extension: [NEGOTIATION_DELIVERY.md](NEGOTIATION_DELIVERY.md) documents the deployed negotiation-first vault, owner consent, fixed 30-minute/24-hour rules and optional evidence assistant. The original release below remains historical; its pending cases retain their deadlines.
+Latest dispute extension: [NEGOTIATION_DELIVERY.md](NEGOTIATION_DELIVERY.md) documents the deployed negotiation-first vault, owner consent, fixed 30-minute/24-hour rules and optional evidence assistant. The original release below remains historical; its two deadline cases have now resolved under their original vault.
 
 Reviewed 2026-10-29. This is an implementation/deployment checkpoint, not an independent security audit. The user authorized completing the work after the earlier stop-and-review checkpoints.
 
@@ -29,7 +29,7 @@ Fresh V1/V2/V3 factories, AgentRegistry, ProviderRegistry, ReputationRegistry an
 
 The real flow registered an agent/provider, created/funded a V3 wallet, served 5 paid calls with verified receipts persisted in Supabase, settled them, released a clean payment, accepted/refunded a dispute and completed an arbiter split. API smoke checks confirmed SIWE, authenticated receipt access, stored proofs, V3 reads and anonymous receipt denial.
 
-Two scenarios are correctly pending real chain time: silent-provider refund at 2026-11-01 10:31:24 UTC and arbiter timeout at 2026-11-01 10:31:56 UTC. All opening/response/settlement hashes and readyAt timestamps are in `contract/deployments/phase3-testnet-e2e.json`. Resume the script after those times; no automatic future run has been scheduled.
+The two historical deadline scenarios completed on 2026-11-01 after real chain time elapsed: silent-provider refund and arbiter timeout. All five scenarios have confirmed resolution transaction hashes in `contract/deployments/phase3-testnet-e2e.json`.
 
 ## Operational limits
 

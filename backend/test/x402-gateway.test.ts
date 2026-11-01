@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { X402Gateway } from "../src/x402-gateway";
+import { FilePendingSettlementStore } from "../src/x402-pending-store";
+import { ManagedHost } from "../src/managed-host";
+import { loadConfig } from "../src/config";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -11,6 +14,27 @@ afterEach(async () => {
 });
 
 describe("x402 gateway", () => {
+  test("production refuses to start without an absolute persistent storage path", () => {
+    const config = loadConfig({ AUTH_ORIGIN: "http://127.0.0.1:3010" });
+    const create = (env: Record<string, string>) =>
+      new ManagedHost(config, {} as never, {} as never, {} as never, env, {} as never);
+    expect(() => create({ NODE_ENV: "production" })).toThrow("X402_STORAGE_DIR");
+    expect(() => create({ NODE_ENV: "production", X402_STORAGE_DIR: "relative/path" })).toThrow("absolute");
+    expect(() => create({ NODE_ENV: "production", X402_STORAGE_DIR: resolve(tmpdir(), "x402-volume") })).not.toThrow();
+  });
+
+  test("pending deposit broadcast survives a new facilitator instance", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sluice-x402-pending-"));
+    directories.push(directory);
+    const hash = `0x${"ab".repeat(32)}`;
+    await new FilePendingSettlementStore(directory).set("deposit-signature", hash);
+    const restarted = new FilePendingSettlementStore(directory);
+    expect(await restarted.get("deposit-signature")).toBe(hash);
+    expect(await restarted.get("different-signature")).toBeUndefined();
+    await restarted.delete("deposit-signature");
+    expect(await new FilePendingSettlementStore(directory).get("deposit-signature")).toBeUndefined();
+  });
+
   test("unpaid calls return standard payment requirements without executing or leaking the handler", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sluice-x402-"));
     directories.push(directory);

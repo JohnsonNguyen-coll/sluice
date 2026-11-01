@@ -1,0 +1,59 @@
+{
+  "setup": {
+    "connectionTest": 200,
+    "funding": "0x81247f4684c40c57069860d2eecc729d884097a40449857d4607e1da3172032d",
+    "activation": "0x41bbba60875bfab35781c52d13dec7ed81047c5b63db2ef35fdb6e02e81ff054",
+    "budget": "0x8997b7f6d0e1f09fcfd5b4e57b70d86ccbb28d3349f9798a350d8d753f109f7a",
+    "terms": "0xe0df137973c92e3de2a27353ffe0a6ba6d811d4e435c653214fd14bc3ba188c0",
+    "usdcRate": "0x2227e5d1a1e6d34a0908d8339a05362805181e5ffb569aa68bca55a71f0c8902"
+  },
+  "createdAt": "2026-11-01T14:09:44.251Z",
+  "service": {
+    "id": "5ccd4ba5-1462-4a7c-9cdb-2c6698937414",
+    "name": "External repository metadata test",
+    "connection": {
+      "url": "https://api.github.com/repos/x402-foundation/x402",
+      "method": "GET",
+      "auth": "none",
+      "header": "",
+      "hasKey": false,
+      "testedAt": null
+    },
+    "slug": "external-repository-metadata-test",
+    "kind": "http-proxy",
+    "owner": "0xfffcd12ed0b2df08d07f5546194bd3bb46d2ae02",
+    "provider": "0x02d54111c5625b1db125b83a2471f6431ba99cab",
+    "price": "10000",
+    "state": "draft",
+    "published": false,
+    "endpoint": "http://127.0.0.1:3001/hosted/5ccd4ba5-1462-4a7c-9cdb-2c6698937414",
+    "x402Endpoint": "http://127.0.0.1:3001/x402/5ccd4ba5-1462-4a7c-9cdb-2c6698937414",
+    "token": "0x3600000000000000000000000000000000000000",
+    "decimals": 6,
+    "registrationTx": null,
+    "lastSettlementTx": null,
+    "lastWorkerAt": null,
+    "workerError": null,
+    "disputeWindow": 3600
+  },
+  "owner": "0xfFFCD12eD0b2Df08D07f5546194BD3bb46d2aE02",
+  "wallet": "0x41b9bF207F0c551Cc7aDffCb72827EFe75818afC",
+  "updatedAt": "2026-11-01T14:24:56.886Z",
+  "expiredVoucherReconciled": {
+    "oldVoucherHash": "0xbb5d41df9e47b744255bc0871f0fb8695e56a6ca89aac4e39bd24b1157769c57",
+    "providerAccepted": false,
+    "onchainNonce": "0"
+  },
+  "unpaidStatus": 402,
+  "paid": {
+    "status": 200,
+    "repository": "x402-foundation/x402",
+    "receiptVerified": true,
+    "voucherHash": "0xf0e54cf4e1b6caaae85c2a8d5ac6667b8e8504c457644e2eb1d666a6e6054143"
+  },
+  "settlement": {
+    "transactionHash": "0x186a8ee8aeb3265f45f3a86ffb12a7cc0aec796d133090ca144a0ec1c3145b8d",
+    "settlementId": "0x8785cfe5ed8629f663a492966bc3d384235eb6c7832d54a14cc684f9450f4121"
+  },
+  "status": "passed"
+}

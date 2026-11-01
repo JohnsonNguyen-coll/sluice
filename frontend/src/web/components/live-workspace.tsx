@@ -423,6 +423,18 @@ function WalletDetail({
           state.value!.version === 1 ? "dailyLimit" : "dailyLimitUsdE6",
       }) as Promise<bigint>,
   });
+  const usdcRateRead = useQuery({
+    queryKey: ["wallet-usdc-rate", record, state.value?.version, revision],
+    enabled: !!client && !!state.value && state.value.version > 1,
+    retry: false,
+    queryFn: async () =>
+      client!.readContract({
+        address: record as Address,
+        abi: walletAbis[state.value!.version],
+        functionName: "tokenRates",
+        args: [siteConfig.usdc],
+      }) as Promise<readonly [bigint, number]>,
+  });
   const w = state.value,
     isOwner = !!w && address?.toLowerCase() === w.owner.toLowerCase();
   return (
@@ -643,6 +655,34 @@ function WalletDetail({
                           Withdraw to my wallet
                         </Button>
                       </form>
+                    </Card>
+                  )}
+                  {section === "wallet-budgets" && w.version > 1 && (
+                    <Card>
+                      <h2>USDC value for spending rules</h2>
+                      <p className="muted small">
+                        The payment authority needs this on-chain rate before
+                        your agent can pay. You control the value used for USD
+                        daily limits; review it if USDC moves away from $1.
+                      </p>
+                      <p className="field-help">
+                        Current rate: {usdcRateRead.data === undefined
+                          ? "Unavailable"
+                          : usdcRateRead.data[0] === 0n
+                            ? "Not set — paid calls are blocked"
+                            : `${formatUnits(usdcRateRead.data[0], 6)} USD per USDC`}
+                      </p>
+                      {isOwner && (
+                        <Button
+                          variant="secondary"
+                          disabled={tx.busy}
+                          onClick={() => void tx.execute(async () => {
+                            await tx.write(w.address, walletAbis[w.version], "setTokenRate", [siteConfig.usdc, 1000000n, 6]);
+                          })}
+                        >
+                          Set USDC to $1
+                        </Button>
+                      )}
                     </Card>
                   )}
                   {section === "wallet-budgets" && (

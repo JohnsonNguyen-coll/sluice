@@ -28,7 +28,7 @@ Custom provider arbiters are rejected by this vault. The approved last-resort ar
 
 V3's external wallet/voucher interface is retained; factory descriptors identify the negotiation vault. Canonical configuration/runtime hashes: `contract/deployments/arc-testnet.json` and `negotiation-arc-testnet.json`. Backend public addresses were updated; frontend imports canonical chain facts and reads API configuration.
 
-Legacy factories/vaults remain discoverable. No old balance or dispute was migrated. The two legacy timeout cases in `phase3-testnet-e2e.json` await their original November 1 deadlines. The legacy resume script resolves its recorded historical release instead of the new factory.
+Legacy factories/vaults remain discoverable. No old balance or dispute was migrated. The two legacy timeout cases in `phase3-testnet-e2e.json` resolved after their original November 1 deadlines. The legacy resume script used its recorded historical release instead of the new factory.
 
 ## Optional evidence assistant
 

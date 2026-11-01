@@ -102,9 +102,9 @@ now lists a fresh coordinated V1/V2/V3 release and retains historical factories.
 Non-upgradeable deployed instances do not receive local fixes or migrate balances.
 
 Real testnet paid calls, receipts, clean release, provider-accepted refund and arbiter
-split are confirmed. Silence refund and arbiter timeout are opened and await real
-3-day deadlines; do not claim those transactions are complete. Resume using
-`contract/scripts/phase3-testnet-e2e.ts` and the persisted transaction report.
+split are confirmed. Silence refund and arbiter timeout were also confirmed after
+their real 3-day deadlines on 2026-11-01. The public transaction report is
+`contract/deployments/phase3-testnet-e2e.json`.
 Keep private keys/state in ignored .env/.tools files; never print or commit them.
 
 ## Workspace layout

@@ -1,0 +1,13 @@
+{
+  "serviceId": "5ccd4ba5-1462-4a7c-9cdb-2c6698937414",
+  "createdAt": "2026-11-01T14:17:34.732Z",
+  "unpaidStatus": 402,
+  "updatedAt": "2026-11-01T14:19:04.774Z",
+  "nativeFunding": "0xf393e9ccb6a06e60484a727023560cfcb08a769bb277e30ffc81d2fde01332b7",
+  "usdcFunding": "0xe07292ac9564be453dc03765c900caeaf5524565a221fce2cfcc1530cc89cbd3",
+  "paidStatus": 200,
+  "repository": "x402-foundation/x402",
+  "paymentResponse": true,
+  "settlementTransaction": "0xadcfb1533ac02ad703a166d254c63ad47a569972db02f82517db1364b95ea3bb",
+  "status": "passed"
+}

@@ -37,7 +37,8 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
   if(path==='/health'&&req.method==='GET'){
    const status=await Promise.allSettled([store.health(),chain.health()]);
    const database=status[0].status==='fulfilled'?'ready':'unavailable',rpc=status[1].status==='fulfilled'?'ready':'unavailable';
-   return json({service:'sluice-backend',status:database==='ready'&&rpc==='ready'?'ready':'degraded',database,rpc,capabilities:{auth:'SIWE bearer sessions',voucherIntake:'V1/V2/V3 authorization queue; settlement is provider-controlled',x402:'v2 batch-settlement on managed API routes',receipts:'Signed V3 receipt reads; provider persistence migration required',reads:'RPC block-window queries; no indexer'}});
+   const ready=database==='ready'&&rpc==='ready';
+   return json({service:'sluice-backend',status:ready?'ready':'degraded',database,rpc,capabilities:{auth:'SIWE bearer sessions',voucherIntake:'V1/V2/V3 authorization queue; settlement is provider-controlled',x402:'v2 batch-settlement on managed API routes',receipts:'Signed V3 receipt reads; provider persistence migration required',reads:'RPC block-window queries; no indexer'}},ready?200:503);
   }
   if(path==='/auth/nonce'&&req.method==='POST'){
    const input=await body(req);const owner=address(input.address);const now=clock();const expires=new Date(now+300000);const nonce=randomBytes(16).toString('hex');

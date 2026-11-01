@@ -1,6 +1,6 @@
 import { upstreamConfig, sealUpstream, openUpstream, gatewayInput, callUpstream, type Upstream } from "./api-gateway";
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import {
   createPublicClient,
   createWalletClient,
@@ -70,6 +70,7 @@ export class ManagedHost implements HostedApi {
   private closing = false;
   private tasks = new Set<Promise<unknown>>();
   private policyAuthority?: PolicyAuthority;
+  private x402StorageRoot: string;
   constructor(
     private config: Config,
     private store: ManagedStore,
@@ -109,6 +110,12 @@ export class ManagedHost implements HostedApi {
     )
       throw Error("MANAGED_API_BASE_URL must be an HTTPS origin or localhost");
     this.base = url.origin;
+    const storageRoot = env.X402_STORAGE_DIR?.trim();
+    if (storageRoot && !isAbsolute(storageRoot))
+      throw Error("X402_STORAGE_DIR must be an absolute path");
+    if (env.NODE_ENV === "production" && !storageRoot)
+      throw Error("Production x402 requires X402_STORAGE_DIR on a persistent volume");
+    this.x402StorageRoot = storageRoot || resolve(import.meta.dir, "../../.tools/x402");
     if (config.policyAuthorityKey) this.policyAuthority = new PolicyAuthority(config);
   }
   capabilities() {
@@ -178,7 +185,7 @@ export class ManagedHost implements HostedApi {
       price: s.price,
       resourceUrl: this.base + "/x402/" + s.id,
       serviceName: s.name,
-      storageDirectory: resolve(import.meta.dir, "../../.tools/x402", s.id),
+      storageDirectory: resolve(this.x402StorageRoot, s.id),
       receiverAuthorizerSigner: account,
       facilitatorSigner: {
         address: account.address,
@@ -760,16 +767,20 @@ export class ManagedHost implements HostedApi {
       if (this.closing) break;
       if (s.state === "draft" || s.worker_error || this.busy.has(s.id))
         continue;
+      let phase = "provider-records";
       try {
         const pending = await this.providers.pending(undefined, s.provider);
+        phase = "x402-scan";
         const x402 = await this.x402(s);
         const x402Pending = await x402.hasClaimableVouchers();
         if (!pending.length && !x402Pending) {
+          phase = "heartbeat";
           await this.store.update(s.id, {
             last_worker_at: new Date().toISOString(),
           });
           continue;
         }
+        phase = "settlement";
         await this.exclusive(s, async (sending) => {
           sending();
           const hashes = [
@@ -788,9 +799,14 @@ export class ManagedHost implements HostedApi {
           )
         )
           continue;
+        const code = apiError(error)?.code || (error instanceof Error ? error.name : "UnknownError");
+        console.error("Managed worker cycle failed", { serviceId: s.id, phase, code });
+        // Read/heartbeat failures cannot have sent a provider transaction.
+        // Keep the next worker cycle eligible to retry a transient RPC/DB outage.
+        if (phase !== "settlement") continue;
         await this.store.update(s.id, {
           worker_error:
-            "Settlement is blocked. An operator must inspect the provider lease, gas and pending vouchers.",
+            `Settlement is blocked (${phase}: ${code}). An operator must inspect the provider lease, gas and pending vouchers.`,
         });
       }
     }
