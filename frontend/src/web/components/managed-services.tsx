@@ -6,7 +6,7 @@ import { formatUnits, parseUnits, type Address, type Hex } from "viem";
 import Link from "next/link";
 import { KeyRound, Globe, ArrowRight } from "lucide-react";
 import { useApi, ApiSignIn } from "./api-session";
-import { Button, Card, Callout } from "./ui";
+import { Button, ButtonLink, Card, Callout } from "./ui";
 import { AddressChip, CodeBlock } from "./primitives";
 import { explorerTransaction } from "../lib/site-config";
 import { routes } from "../lib/routes";
@@ -345,6 +345,7 @@ function ManagedServicesEditor() {
             needed to connect an existing API; callers use the agent SDK for
             payment authorization.
           </p>
+          {s.state === "active" && <ButtonLink href={"/app/try/" + s.id} variant="secondary">Try a paid call ↗</ButtonLink>}
           <CodeBlock
             code={s.x402Endpoint}
             filename="x402 v2 · batch-settlement endpoint"

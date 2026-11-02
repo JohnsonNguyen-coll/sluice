@@ -7,6 +7,7 @@ import {RpcGateway,type ValidVoucher} from '../src/chain';
 import type {Store,Challenge,VoucherRecord,EvidenceRecord} from '../src/store';
 import {SupabaseStore} from '../src/store';
 import {fail} from '../src/errors';
+import {receiptData,type SignedReceipt} from '@sluice/sdk';
 import {keccak256,toHex,verifyMessage,type Address,type Hex} from 'viem';
 const account=privateKeyToAccount('0x'+'11'.repeat(32) as Hex);
 const stranger=privateKeyToAccount('0x'+'22'.repeat(32) as Hex);
@@ -75,6 +76,21 @@ test('healthcheck fails deployment readiness when storage or RPC is down',async(
  const response=await createApi(config,failedStore,new TestChain(config))(new Request('http://localhost:3001/health'),'tests');
  expect(response.status).toBe(503);
  expect((await response.json()).status).toBe('degraded');
+});
+test('a signed receipt reveals only its own settlement status',async()=>{
+ const id=('0x'+'18'.repeat(32)) as Hex;
+ const signed:SignedReceipt={wallet:('0x'+'44'.repeat(20)) as Address,provider:account.address,chainId:config.chainId,receipt:{voucherHash:id,requestHash:('0x'+'19'.repeat(32)) as Hex,responseHash:('0x'+'20'.repeat(32)) as Hex,status:200,timestamp:'1',token:('0x'+'33'.repeat(20)) as Address,nonce:'1',amount:'10000'},signature:'0x' as Hex};
+ signed.signature=await account.signTypedData(receiptData(signed));
+ let settled=false;
+ const testStore=Object.create(store) as Store;
+ testStore.receipt=async requested=>requested===id?{receipt:signed,...(settled?{commitment:{root:id,proof:[],settlementId:id,settlementNonce:'1',transactionHash:id}}:{})}:null;
+ const endpoint=createApi(config,testStore,new TestChain(config));
+ const ask=(receipt:SignedReceipt)=>endpoint(new Request('http://localhost:3001/receipt-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({receipt})}),'receipt-test');
+ expect((await endpoint(new Request('http://localhost:3001/receipt-status',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"receipt":{}}'}),'receipt-test')).status).toBe(400);
+ expect((await ask({...signed,signature:('0x'+'11'.repeat(65)) as Hex})).status).toBe(404);
+ expect((await (await ask(signed)).json()).status).toBe('awaiting-settlement');
+ settled=true;
+ expect((await (await ask(signed)).json()).status).toBe('settled');
 });
 test('bearer sessions are hashed, expire, and can be revoked',async()=>{
  const {token}=await login();expect((await request('/auth/me','GET',undefined,token)).status).toBe(200);

@@ -21,6 +21,27 @@ Existing hosted utilities remain available to their owners and historical receip
 7. A successful JSON response within the last 24 hours is required for activation.
    Fund provider gas and activate. Requests then use the generated `/hosted/<id>` URL.
 
+## Try a paid call in the dashboard
+
+An active managed API shows **Try a paid call** on the Provider page and, if
+published, its Directory detail. The browser page at `/app/try/<serviceId>`
+reads the public service description, accepts a JSON request and payment-wallet
+address, then obtains a live 402 quote. The user must connect the **agent signer**
+for that payment wallet and explicitly confirm the quoted charge. It uses the
+real AgentPay SDK, a persistent IndexedDB channel store and EIP-712 signatures
+from the connected wallet. The verified JSON response and signed receipt are
+shown on the page. A receipt-scoped status check refreshes until the worker's
+confirmed settlement record appears, with a link to payment details. The
+receipt confirms acceptance; it does not mean the worker has already settled
+on-chain. No API result is published to the Directory.
+
+The owner must have funded the payment wallet, granted this provider a budget
+and accepted its arbitration terms first. The browser signer should not also
+operate a separate SDK instance with independent channel state for the same
+wallet/provider/token; use a dedicated test agent channel when trying the UI.
+The page never asks for or stores a private key. External provider listings
+without a Sluice-managed endpoint retain their own integration instructions.
+
 Pause before replacing a key. Key replacement invalidates the previous connection
 test. Endpoint, authentication type, method and price are immutable for this
 release: create a new connection to change them. This avoids repointing signed

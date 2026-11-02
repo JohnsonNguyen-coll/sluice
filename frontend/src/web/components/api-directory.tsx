@@ -6,7 +6,7 @@ import { formatUnits } from "viem";
 import { verifyDomain } from "@sluice/sdk";
 import Link from "next/link";
 import { Search, ArrowUpRight } from "lucide-react";
-import { useApi, ApiSignIn } from "./api-session";
+import { apiBase, useApi, ApiSignIn } from "./api-session";
 import { Button, ButtonLink, Card, Callout } from "./ui";
 import { CodeBlock, AddressChip } from "./primitives";
 import { routes } from "../lib/routes";
@@ -236,6 +236,14 @@ export function ApiListingDetail({
     chosen = wallets.data?.items.some((x) => x.wallet === selected)
       ? selected
       : wallets.data?.items[0]?.wallet;
+  let managedServiceId = "";
+  if (item) {
+    try {
+      const endpoint = new URL(item.endpoint);
+      const match = endpoint.pathname.match(/^\/hosted\/([a-f0-9-]{36})$/);
+      if (endpoint.origin === new URL(apiBase).origin && match) managedServiceId = match[1];
+    } catch { /* External provider URLs do not have a built-in playground. */ }
+  }
   if (entry.isLoading)
     return <p role="status">Checking this API’s listing and provider…</p>;
   if (entry.error || !item)
@@ -447,6 +455,7 @@ export function ApiListingDetail({
           This address is published by the provider. No automatic request or
           payment is made here.
         </p>
+        {managedServiceId && <ButtonLink href={"/app/try/" + managedServiceId} variant="primary">Try a paid call ↗</ButtonLink>}
         {item.docs_url && (
           <a
             className="text-link"

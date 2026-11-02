@@ -6,7 +6,7 @@ import type {Config} from './config';
 import type {Gateway} from './chain';
 import type {Store} from './store';
 import {apiError,fail} from './errors';
-import {verifyReceipt,receiptHash,computeReputation,type ReputationInput} from '@sluice/sdk';
+import {verifyReceipt,receiptHash,parseReceipt,computeReputation,type ReputationInput} from '@sluice/sdk';
 import {SupabaseCatalogStore,shortText,httpsUrl,type CatalogStore,type ApiListing} from './catalog';
 import deployment from '../../contract/deployments/arc-testnet.json';
 import {parseUnits} from 'viem';
@@ -114,6 +114,15 @@ export function createApi(config:Config,store:Store,chain:Gateway,clock:()=>numb
    const input=await body(req);if(typeof input.content!=='string'||!input.content.trim()||new TextEncoder().encode(input.content).length>16384)fail(400,'INVALID_EVIDENCE','content must be nonempty UTF-8 text of at most 16 KiB');
    const hash=keccak256(toHex(input.content));await store.addEvidence({id:hash,settlement_id:id.toLowerCase(),author:who.toLowerCase(),content:input.content,created_at:new Date(clock()).toISOString()});
    return json({evidenceHash:hash,stored:true,onChain:false,notice:'Submit this hash through the relevant contract transaction yourself.'},201);
+  }
+  if(path==='/receipt-status'&&req.method==='POST'){
+   const input=await body(req);let signed:ReturnType<typeof parseReceipt>;
+   try{signed=parseReceipt(input.receipt);}catch{fail(400,'INVALID_RECEIPT','A signed receipt is required');}
+   const id=signed.receipt.voucherHash;
+   rate('receipt-status:'+id,30);
+   const record=await store.receipt(id);
+   if(!record||record.receipt.signature.toLowerCase()!==signed.signature.toLowerCase()||receiptHash(record.receipt)!==receiptHash(signed)||!await verifyReceipt(signed))fail(404,'RECEIPT_NOT_FOUND','No matching signed receipt');
+   return json({status:record.commitment?'settled':'awaiting-settlement',settlementId:record.commitment?.settlementId||null});
   }
   if(path==='/receipts'&&req.method==='GET'){
    const who=await actor(req),{limit,offset}=page(url),selected=url.searchParams.get('wallet');let wallet:string|undefined,provider:string|undefined=who;
